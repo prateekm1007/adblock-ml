@@ -21,7 +21,7 @@ import { EventLogger }        from './event-logger.js';
 import { FeedbackEngine }     from './feedback-engine.js';
 import { SyncLayer }          from './sync-layer.js';
 import { RiskEngine } from './risk-engine.js';
-import { RuntimeConfig }      from './runtime-config.js';
+import { RiskEngine } from "./risk-engine.js";`nimport { RuntimeConfig }      from './runtime-config.js';
 
 // â”€â”€â”€ Singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -34,7 +34,7 @@ const listManager  = new ListManager();
 const featureStore = new FeatureStore();
 const eventLogger  = new EventLogger();
 const feedbackEng  = new FeedbackEngine(eventLogger, dynamicRules);
-const syncLayer    = new SyncLayer(eventLogger, classifier);
+const riskEngine = new RiskEngine();`nconst syncLayer    = new SyncLayer(eventLogger, classifier);
 const riskEngine    = new RiskEngine();
 // â”€â”€â”€ Thresholds & constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -98,6 +98,7 @@ function resetTabState(tabId, url) {
 
   requestGraph.newPage(tabId, url);
   stats.newPage(tabId, url);
+  riskEngine.resetTab(tabId);
   riskEngine.resetTab(tabId);
 }
 
@@ -296,7 +297,13 @@ async function recordMlOnlyHit(url, type, tabId, initiator, score, features) {
   if (features[23] === 0) {
     riskEngine.recordSignal(tabId, 'first_party_tracking', true, { url, score, features });
   }
-await writeMlSummary(tabId, count, mlOnlyEntry);
+  // Risk Engine Integration
+  if (features?.[25]) riskEngine.recordSignal(tabId, 'late_injection', true);
+  if ((features?.[7] > 3) || (features?.[8] > 3) || (features?.[16] > 0)) riskEngine.recordSignal(tabId, 'obfuscation', true);
+  if (features?.[23] === 0) riskEngine.recordSignal(tabId, 'first_party_tracking', true);
+
+  await writeMlSummary(tabId, count, mlOnlyEntry);
+  await writeRiskSummary(tabId);
   await writeRiskSummary(tabId);
 
   console.debug(`[AdBlockML] ML-only hit #${count} (${confidence}): ${domain} â€” ${reason}`);
@@ -421,7 +428,13 @@ function setupMessageListeners() {
         sendResponse({ risk, diagnostics });
         return false;
       }
-case 'GET_STATS': {
+      case 'GET_RISK': {
+        const tabId = message.tabId ?? sender.tab?.id;
+        sendResponse({ risk: riskEngine.getPageRisk(tabId) });
+        return false;
+      }
+
+      case 'GET_STATS': {
         const tabId = message.tabId ?? sender.tab?.id;
         Promise.all([
           stats.getGlobalStats(),
@@ -532,5 +545,6 @@ async function runBenchmark() {
 
 // â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initialize().catch(console.error);
+
 
 

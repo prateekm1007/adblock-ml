@@ -1,7 +1,7 @@
 ﻿/**
  * Risk Engine v1 — Pattern-Based Page Safety Scoring
+ * Stable signals only. Designed for consistency across reloads.
  */
-
 export class RiskEngine {
   constructor() {
     this._tabRisks = new Map();
@@ -10,10 +10,8 @@ export class RiskEngine {
   }
 
   recordSignal(tabId, signal, detected, meta = {}) {
-    if (!['late_injection', 'obfuscation', 'first_party_tracking', 'multi_domain'].includes(signal)) {
-      console.warn(`[RiskEngine] Unknown signal: ${signal}`);
-      return;
-    }
+    const valid = ['late_injection','obfuscation','first_party_tracking','multi_domain'];
+    if (!valid.includes(signal)) return;
 
     if (!this._signalHistory.has(tabId)) {
       this._signalHistory.set(tabId, new Map());
@@ -21,19 +19,16 @@ export class RiskEngine {
     }
 
     const history = this._signalHistory.get(tabId);
-    const signalLog = history.get(signal) || [];
-    signalLog.push(detected);
-    if (signalLog.length > 3) signalLog.shift();
-    history.set(signal, signalLog);
+    const log = history.get(signal) || [];
+    log.push(detected);
+    if (log.length > 3) log.shift();
+    history.set(signal, log);
 
     this._computeRisk(tabId);
   }
 
   getPageRisk(tabId) {
-    if (!this._tabRisks.has(tabId)) {
-      return { level: 'LOW', score: 0, reasons: [], confidence: 1.0 };
-    }
-    return this._tabRisks.get(tabId);
+    return this._tabRisks.get(tabId) || { level: 'LOW', score: 0, reasons: [], confidence: 1.0 };
   }
 
   resetTab(tabId) {
@@ -45,120 +40,48 @@ export class RiskEngine {
   getDiagnostics(tabId) {
     const signals = this._signalHistory.get(tabId) || new Map();
     const stability = this._stabilityWindow.get(tabId) || {};
-
-    const diagnostic = {};
+    const diag = {};
     for (const [sig, log] of signals) {
-      diagnostic[sig] = {
-        events: log,
-        detected_count: log.filter(b => b).length,
-        detection_rate: log.filter(b => b).length / Math.max(log.length, 1),
-      };
+      diag[sig] = { events: log, detected: log.filter(Boolean).length };
     }
-
-    return {
-      ...diagnostic,
-      stability_info: {
-        previous_score: stability.prevScore,
-        previous_level: stability.prevLevel,
-        stability_window_ms: Date.now() - (stability.timestamp || 0),
-      },
-    };
+    return { ...diag, stability };
   }
 
   _computeRisk(tabId) {
     const signals = this._signalHistory.get(tabId) || new Map();
     const stability = this._stabilityWindow.get(tabId) || {};
-
-    const signalConfidence = this._aggregateSignals(signals);
-
-    let rawScore = 0;
+    const sc = this._aggregateSignals(signals);
+    let score = 0;
     const reasons = [];
 
-    if (signalConfidence.late_injection >= 0.5) {
-      rawScore += 35;
-      reasons.push('Late script injection detected');
-    }
+    if (sc.late_injection >= 0.5)       { score += 35; reasons.push("Late script injection detected"); }
+    if (sc.obfuscation >= 0.4)          { score += 25; reasons.push("Obfuscated tracking patterns"); }
+    if (sc.first_party_tracking >= 0.5) { score += 20; reasons.push("First-party tracking signals"); }
+    if (sc.multi_domain >= 0.6)         { score += 15; reasons.push("Multi-domain coordination detected"); }
 
-    if (signalConfidence.obfuscation >= 0.4) {
-      rawScore += 25;
-      reasons.push('Obfuscated tracking patterns');
-    }
+    const smoothed = this._smoothScore(score, stability.prevScore || 0, Date.now() - (stability.timestamp || 0));
 
-    if (signalConfidence.first_party_tracking >= 0.5) {
-      rawScore += 20;
-      reasons.push('First-party tracking signals');
-    }
+    let level = smoothed >= 60 ? 'HIGH' : (smoothed >= 30 ? 'MEDIUM' : 'LOW');
+    let confidence = level === 'HIGH' ? 0.85 : (level === 'MEDIUM' ? 0.75 : 0.9);
 
-    if (signalConfidence.multi_domain >= 0.6) {
-      rawScore += 15;
-      reasons.push('Multi-domain coordination detected');
-    }
-
-    const smoothedScore = this._smoothScore(
-      rawScore,
-      stability.prevScore,
-      Date.now() - (stability.timestamp || 0)
-    );
-
-    let level = 'LOW';
-    let confidence = 0.8;
-
-    if (smoothedScore >= 60) {
-      level = 'HIGH';
-      confidence = Math.min(0.95, 0.7 + signalConfidence.late_injection * 0.25);
-    } else if (smoothedScore >= 30) {
-      level = 'MEDIUM';
-      confidence = Math.min(0.85, 0.65 + (signalConfidence.obfuscation + signalConfidence.first_party_tracking) * 0.2);
-    } else {
-      level = 'LOW';
-      confidence = 1.0 - Math.max(...Object.values(signalConfidence)) * 0.1;
-    }
-
-    const result = {
-      level,
-      score: Math.round(smoothedScore),
-      reasons,
-      confidence: Math.round(confidence * 100) / 100,
-      timestamp: Date.now(),
-    };
-
+    const result = { level, score: Math.round(smoothed), reasons, confidence, timestamp: Date.now() };
     this._tabRisks.set(tabId, result);
-    this._stabilityWindow.set(tabId, {
-      prevScore: smoothedScore,
-      prevLevel: level,
-      timestamp: Date.now(),
-    });
-
-    console.debug(`[RiskEngine] Tab ${tabId}: ${level} (${Math.round(smoothedScore)}) — ${reasons.join(', ')}`);
+    this._stabilityWindow.set(tabId, { prevScore: smoothed, prevLevel: level, timestamp: Date.now() });
   }
 
-  _aggregateSignals(signalMap) {
-    const confidence = {
-      late_injection: 0,
-      obfuscation: 0,
-      first_party_tracking: 0,
-      multi_domain: 0,
-    };
-
-    for (const [signal, history] of signalMap) {
-      if (history.length === 0) continue;
-
-      const detectionRate = history.filter(b => b).length / history.length;
-      const recencyBoost = history[history.length - 1] ? 1.2 : 0.8;
-
-      confidence[signal] = Math.min(1.0, detectionRate * recencyBoost);
+  _aggregateSignals(map) {
+    const c = { late_injection:0, obfuscation:0, first_party_tracking:0, multi_domain:0 };
+    for (const [k,v] of map) {
+      if (v.length === 0) continue;
+      const rate = v.filter(Boolean).length / v.length;
+      c[k] = Math.min(1, rate * (v[v.length-1] ? 1.2 : 0.8));
     }
-
-    return confidence;
+    return c;
   }
 
-  _smoothScore(rawScore, prevScore, timeSinceLastMs) {
-    if (timeSinceLastMs < 10_000) {
-      return prevScore * 0.8 + rawScore * 0.2;
-    } else if (timeSinceLastMs < 30_000) {
-      return prevScore * 0.5 + rawScore * 0.5;
-    } else {
-      return rawScore;
-    }
+  _smoothScore(raw, prev, elapsed) {
+    if (elapsed < 10000) return prev*0.8 + raw*0.2;
+    if (elapsed < 30000) return prev*0.5 + raw*0.5;
+    return raw;
   }
 }
