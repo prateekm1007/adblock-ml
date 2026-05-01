@@ -1,4 +1,4 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+﻿* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   width: 320px;
@@ -277,7 +277,7 @@ body {
   border-left: 2px solid #3b82f6;
 }
 
-/* ── ML-only banner (Task 4) ─────────────────────────────────────── */
+/* â”€â”€ ML-only banner (Task 4) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ml-banner {
   display: flex;
   align-items: center;
@@ -292,7 +292,7 @@ body {
 .ml-banner-standard      { background: #f8f9fc; color: #64748b; }
 .ml-banner-icon          { font-size: 11px; flex-shrink: 0; }
 
-/* ── ML detail entries (Task 5) ──────────────────────────────────── */
+/* â”€â”€ ML detail entries (Task 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ml-detail-list {
   margin: 0 15px 4px;
   border: 0.5px solid #e2e8f0;
@@ -341,7 +341,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* ── Allow button (Task 6) ───────────────────────────────────────── */
+/* â”€â”€ Allow button (Task 6) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .allow-btn {
   flex-shrink: 0;
   padding: 2px 7px;
@@ -378,3 +378,73 @@ body {
   line-height: 1;
 }
 .cancel-btn:hover { background: #f1f5f9; color: #1e293b; }
+
+
+#risk-container {
+  margin-bottom: 16px;
+}
+
+.risk-badge {
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.risk-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.risk-emoji {
+  font-size: 18px;
+}
+
+.risk-level {
+  flex: 1;
+}
+
+.risk-score {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.risk-reasons {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.risk-reasons strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #333;
+}
+
+.risk-reasons ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.risk-reasons li {
+  margin: 3px 0;
+  color: #555;
+  font-size: 12px;
+}
+
+.risk-confidence {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #999;
+  text-align: right;
+}
+

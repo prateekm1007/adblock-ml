@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Popup controller v3
  *
  * Tasks implemented:
- *   Task 3 — Reads ml_summary_${tabId} from session storage via GET_STATS
- *   Task 4 — Shows "+X trackers blocked by advanced detection" banner when
+ *   Task 3 â€” Reads ml_summary_${tabId} from session storage via GET_STATS
+ *   Task 4 â€” Shows "+X trackers blocked by advanced detection" banner when
  *             ml_only_count >= 2, else "Standard protection handled this page"
- *   Task 5 — Renders ML-only request detail entries with type/confidence/reason/domain
- *   Task 6 — Allow button on each ML detail entry: allowlists domain + reloads tab
+ *   Task 5 â€” Renders ML-only request detail entries with type/confidence/reason/domain
+ *   Task 6 â€” Allow button on each ML detail entry: allowlists domain + reloads tab
  *
  * Security: all dynamic content via textContent or safe el() construction.
  * No innerHTML with external data anywhere.
@@ -17,7 +17,7 @@
 let _selectedUrl = null;
 let _currentTabId = null;
 
-// ─── DOM helpers ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ DOM helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function el(tag, attrs, ...children) {
   const node = document.createElement(tag);
@@ -36,7 +36,7 @@ function el(tag, attrs, ...children) {
 }
 
 function fmt(n) {
-  if (n == null) return '—';
+  if (n == null) return 'â€”';
   if (n >= 1e6)  return `${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3)  return `${(n / 1e3).toFixed(1)}K`;
   return String(n);
@@ -52,7 +52,7 @@ async function getCurrentTab() {
   return tab;
 }
 
-// ─── Main render ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function render() {
   const tab = await getCurrentTab();
@@ -80,23 +80,23 @@ async function render() {
   setupFeedback();
 }
 
-// ─── Classifier status ────────────────────────────────────────────────────────
+// â”€â”€â”€ Classifier status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderClassifier(info) {
   const sub = document.getElementById('classifier-status');
   if (!info) { sub.textContent = 'Model unavailable'; return; }
   if (info.type === 'onnx_gbm') {
-    sub.textContent = `ML active · v${info.version ?? '?'} · ${info.features} features`;
+    sub.textContent = `ML active Â· v${info.version ?? '?'} Â· ${info.features} features`;
     sub.style.color = '#34d399';
   } else if (info.type === 'heuristic') {
-    sub.textContent = 'Heuristic mode — train model for full ML';
+    sub.textContent = 'Heuristic mode â€” train model for full ML';
     sub.style.color = '#fbbf24';
   } else {
-    sub.textContent = 'Classifier loading…';
+    sub.textContent = 'Classifier loadingâ€¦';
   }
 }
 
-// ─── Global stats ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Global stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderGlobal(global) {
   if (!global) return;
@@ -107,7 +107,7 @@ function renderGlobal(global) {
   document.getElementById('ml-rate').textContent = `${rate}%`;
 }
 
-// ─── Tab stats ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tab stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderTab(tabStats) {
   document.getElementById('tab-blocked').textContent = fmt(tabStats?.blocked ?? 0);
@@ -147,7 +147,7 @@ function renderTab(tabStats) {
   });
 }
 
-// ─── Breakdown bars ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Breakdown bars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderBreakdown(global) {
   if (!global) return;
@@ -164,7 +164,7 @@ function renderBreakdown(global) {
   document.getElementById('pct-cache').textContent = `${cachePct}%`;
 }
 
-// ─── Task 3 + 4 + 5: ML summary banner + detail list ─────────────────────────
+// â”€â”€â”€ Task 3 + 4 + 5: ML summary banner + detail list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderMlSummary(mlSummary) {
   const banner    = document.getElementById('ml-banner');
@@ -213,7 +213,7 @@ function renderMlSummary(mlSummary) {
 
   detailTitle.style.display = '';
 
-  // Deduplicate by domain — show most recent entry per domain
+  // Deduplicate by domain â€” show most recent entry per domain
   const byDomain = new Map();
   entries.forEach(e => byDomain.set(e.domain, e));
 
@@ -225,12 +225,12 @@ function renderMlSummary(mlSummary) {
     const domain     = el('span', { className: 'detail-domain', textContent: entry.domain });
     const reason     = el('span', { className: 'detail-reason', textContent: reasonLabel });
 
-    // Patch 2: persistent two-step allow — no timeout, explicit cancel.
-    // Step 1: 'Allow' → renders a confirm button inline.
+    // Patch 2: persistent two-step allow â€” no timeout, explicit cancel.
+    // Step 1: 'Allow' â†’ renders a confirm button inline.
     // Step 2: 'Confirm' applies. 'Cancel' resets. No silent timeouts.
     const allowBtn   = el('button', { className: 'allow-btn',     title: 'Allow this domain' }, 'Allow');
     const confirmBtn = el('button', { className: 'allow-btn allow-btn-confirm', title: `Confirm: allow ${entry.domain}` }, 'Confirm');
-    const cancelBtn  = el('button', { className: 'cancel-btn',    title: 'Cancel' }, '✕');
+    const cancelBtn  = el('button', { className: 'cancel-btn',    title: 'Cancel' }, 'âœ•');
     confirmBtn.style.display = 'none';
     cancelBtn.style.display  = 'none';
 
@@ -274,10 +274,10 @@ const REASON_LABELS = {
   ml_pattern:          'ML pattern match',
 };
 
-// ─── Task 6: Allow domain ─────────────────────────────────────────────────────
+// â”€â”€â”€ Task 6: Allow domain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function handleAllow(domain, btn) {
-  btn.textContent = '…';
+  btn.textContent = 'â€¦';
   btn.disabled    = true;
 
   chrome.runtime.sendMessage(
@@ -287,13 +287,13 @@ function handleAllow(domain, btn) {
         btn.textContent = 'Error';
         return;
       }
-      // Tab will reload — popup closes automatically
-      btn.textContent = 'Allowed ✓';
+      // Tab will reload â€” popup closes automatically
+      btn.textContent = 'Allowed âœ“';
     }
   );
 }
 
-// ─── Site toggle ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Site toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupToggle(hostname) {
   const btn = document.getElementById('site-toggle');
@@ -319,7 +319,7 @@ function updateToggleUI(btn, enabled) {
   btn.classList.toggle('disabled', !enabled);
 }
 
-// ─── Feedback ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupFeedback() {
   updateFeedbackButtons(false);
@@ -346,7 +346,7 @@ function sendFeedback(url, feedbackType, confirmText) {
     if (chrome.runtime.lastError || !res?.ok) return;
     const btn = document.getElementById(feedbackType === 'fp' ? 'btn-fp' : 'btn-fn');
     const orig = btn.textContent;
-    btn.textContent = '✓ ' + confirmText;
+    btn.textContent = 'âœ“ ' + confirmText;
     setTimeout(() => { btn.textContent = orig; }, 2500);
     _selectedUrl = null;
     updateFeedbackButtons(false);
@@ -354,7 +354,7 @@ function sendFeedback(url, feedbackType, confirmText) {
   });
 }
 
-// ─── Sync badge ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Sync badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function renderSyncBadge(count) {
   const badge = document.getElementById('sync-badge');
@@ -367,14 +367,14 @@ function renderSyncBadge(count) {
   }
 }
 
-// ─── Benchmark ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Benchmark â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 document.getElementById('run-benchmark').addEventListener('click', () => {
   const panel = document.getElementById('benchmark-panel');
   const res   = document.getElementById('benchmark-results');
   panel.classList.remove('hidden');
   res.textContent = '';
-  res.appendChild(el('div', { style: 'padding:8px 0;color:#64748b;font-size:11px', textContent: 'Running…' }));
+  res.appendChild(el('div', { style: 'padding:8px 0;color:#64748b;font-size:11px', textContent: 'Runningâ€¦' }));
 
   chrome.runtime.sendMessage({ type: 'RUN_BENCHMARK' }, (data) => {
     res.textContent = '';
@@ -401,15 +401,16 @@ document.getElementById('run-benchmark').addEventListener('click', () => {
   });
 });
 
-// ─── Clear cache ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Clear cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 document.getElementById('clear-cache').addEventListener('click', () => {
   const btn = document.getElementById('clear-cache');
   chrome.runtime.sendMessage({ type: 'CLEAR_DYNAMIC_RULES' }, () => {
-    btn.textContent = 'Cleared ✓';
+    btn.textContent = 'Cleared âœ“';
     setTimeout(() => { btn.textContent = 'Clear ML cache'; }, 2000);
   });
 });
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 render();
+

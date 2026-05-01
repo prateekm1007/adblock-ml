@@ -1,5 +1,5 @@
-/**
- * AdBlock ML — Service Worker v4
+﻿/**
+ * AdBlock ML â€” Service Worker v4
  *
  * What's new:
  *   - seenRequests dedup Set (scoped per tab, cleared on navigation)
@@ -7,7 +7,7 @@
  *   - tabStartTime 15s gate (only classify fresh page requests)
  *   - isEssentialRequest guard (never touch main_frame / document / stylesheet)
  *   - ml_summary_${tabId} written to session storage after each ML block
- *   - ALLOWLIST_DOMAIN message handler (allow button → reload tab)
+ *   - ALLOWLIST_DOMAIN message handler (allow button â†’ reload tab)
  *   - explanation tags derived from feature vector
  */
 
@@ -20,9 +20,10 @@ import { FeatureStore }       from './feature-store.js';
 import { EventLogger }        from './event-logger.js';
 import { FeedbackEngine }     from './feedback-engine.js';
 import { SyncLayer }          from './sync-layer.js';
+import { RiskEngine } from './risk-engine.js';
 import { RuntimeConfig }      from './runtime-config.js';
 
-// ─── Singletons ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const config       = new RuntimeConfig();
 const classifier   = new AdFlushClassifier();
@@ -34,12 +35,12 @@ const featureStore = new FeatureStore();
 const eventLogger  = new EventLogger();
 const feedbackEng  = new FeedbackEngine(eventLogger, dynamicRules);
 const syncLayer    = new SyncLayer(eventLogger, classifier);
-
-// ─── Thresholds & constants ───────────────────────────────────────────────────
+const riskEngine    = new RiskEngine();
+// â”€â”€â”€ Thresholds & constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ML_THRESHOLD       = 0.78;
 const ML_ONLY_THRESHOLD  = 0.75;   // lower bound for ML-only event logging
-const HIGH_CONF          = 0.90;   // score >= this → confidence: "High"
+const HIGH_CONF          = 0.90;   // score >= this â†’ confidence: "High"
 const PAGE_WINDOW_MS     = 15_000; // only classify requests in first 15s
 const DOMAIN_HIT_MIN     = 2;      // stabilization: require 2 hits before logging
 const DOMAIN_HIT_MAX     = 3;      // stop logging after 3 hits (noise filter)
@@ -54,16 +55,16 @@ const ML_ELIGIBLE_TYPES = new Set([
   'script', 'xmlhttprequest', 'fetch', 'image', 'sub_frame', 'media',
 ]);
 
-// ─── Per-tab state ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Per-tab state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // All maps keyed by tabId, cleared on navigation
 
-const seenRequests = new Map();   // tabId → Set<requestKey>
-const domainCount  = new Map();   // tabId → Map<domain, hitCount>
-const tabStartTime = new Map();   // tabId → timestamp (ms)
-const mlBudget     = new Map();   // tabId → remaining inference budget
-const mlOnlyCount  = new Map();   // tabId → count of ML-only blocks this page
+const seenRequests = new Map();   // tabId â†’ Set<requestKey>
+const domainCount  = new Map();   // tabId â†’ Map<domain, hitCount>
+const tabStartTime = new Map();   // tabId â†’ timestamp (ms)
+const mlBudget     = new Map();   // tabId â†’ remaining inference budget
+const mlOnlyCount  = new Map();   // tabId â†’ count of ML-only blocks this page
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function initialize() {
   console.log('[AdBlockML] Service worker v4 starting');
@@ -86,7 +87,7 @@ async function initialize() {
   console.log(`[AdBlockML] Ready | classifier: ${classifier.getModelInfo().type}`);
 }
 
-// ─── Navigation — reset all per-tab state ─────────────────────────────────────
+// â”€â”€â”€ Navigation â€” reset all per-tab state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function resetTabState(tabId, url) {
   tabStartTime.set(tabId, Date.now());
@@ -97,9 +98,10 @@ function resetTabState(tabId, url) {
 
   requestGraph.newPage(tabId, url);
   stats.newPage(tabId, url);
+  riskEngine.resetTab(tabId);
 }
 
-// ─── Web Request ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Web Request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupWebRequestListeners() {
   chrome.webRequest.onBeforeRequest.addListener(
@@ -125,16 +127,16 @@ function setupWebRequestListeners() {
     await feedbackEng.onNavigation(tabId, url);
   });
 
-  // Patch 1: SPA navigation — React/Vue/etc. push history without a full
+  // Patch 1: SPA navigation â€” React/Vue/etc. push history without a full
   // page load, so onCommitted never fires. Reset per-tab state so the
   // 15s window and dedup Set start fresh on each logical page view.
   chrome.webNavigation.onHistoryStateUpdated.addListener(({ tabId, frameId }) => {
     if (frameId !== 0) return;
-    resetTabState(tabId, '');  // url unknown at this point — graph will update on next request
+    resetTabState(tabId, '');  // url unknown at this point â€” graph will update on next request
   });
 }
 
-// Synchronous — must not be async
+// Synchronous â€” must not be async
 function onBeforeRequest(details) {
   const { requestId, url, type, tabId, initiator, timeStamp } = details;
 
@@ -150,16 +152,16 @@ function onBeforeRequest(details) {
   classifyAsync(url, type, tabId, initiator || '', timeStamp);
 }
 
-// ─── Core classify + ML-only logic ────────────────────────────────────────────
+// â”€â”€â”€ Core classify + ML-only logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function classifyAsync(url, type, tabId, initiator, timestamp) {
   try {
 
-    // ── Task 2: Essential filter — never touch these ───────────────────────
+    // â”€â”€ Task 2: Essential filter â€” never touch these â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const isEssential = ESSENTIAL_TYPES.has(type);
     if (isEssential) return;
 
-    // ── Gate 1: dynamic cache ──────────────────────────────────────────────
+    // â”€â”€ Gate 1: dynamic cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (await dynamicRules.isBlocked(url)) {
       stats.recordBlock(tabId, url, 'dynamic_cache');
       feedbackEng.recordBlock(tabId, url);
@@ -167,26 +169,26 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
       return;
     }
 
-    // ── Gate 2: feature store safe-domain skip ─────────────────────────────
+    // â”€â”€ Gate 2: feature store safe-domain skip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (config.featureStoreEnabled && await featureStore.isCachedSafe(url)) {
       stats.recordAllow(tabId, url, 0);
       return;
     }
 
-    // ── Gate 3: ML disabled (ablation) ────────────────────────────────────
+    // â”€â”€ Gate 3: ML disabled (ablation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!config.mlEnabled) {
       stats.recordAllow(tabId, url, null);
       return;
     }
 
-    // ── Gate 4: inference budget — explicit init + cap ─────────────────────
+    // â”€â”€ Gate 4: inference budget â€” explicit init + cap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (!mlBudget.has(tabId)) mlBudget.set(tabId, 0);
     if (mlBudget.get(tabId) >= ML_BUDGET_PER_PAGE) return;
     mlBudget.set(tabId, mlBudget.get(tabId) + 1);
 
     if (!classifier.isReady()) return;
 
-    // ── Classify — with latency guard ──────────────────────────────────────
+    // â”€â”€ Classify â€” with latency guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const pageContext  = requestGraph.getPageContext(tabId);
     const features     = classifier.extractFeatures({ url, type, initiator, timestamp, pageContext });
     const inferStart   = performance.now();
@@ -196,9 +198,9 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
     // Patch 5: if inference exceeded the latency budget, abort all side-effects
     // entirely. The DNR static rules already handled legitimate blocks; slow
     // ML means something is wrong (GC pause, model reload, memory pressure).
-    // No logging, no counting, no dynamic rule addition — clean fast exit.
+    // No logging, no counting, no dynamic rule addition â€” clean fast exit.
     if (inferMs > 10) {
-      console.warn(`[AdBlockML] Slow inference ${inferMs.toFixed(1)}ms — aborting ML path`);
+      console.warn(`[AdBlockML] Slow inference ${inferMs.toFixed(1)}ms â€” aborting ML path`);
       return;
     }
 
@@ -206,7 +208,7 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
       await featureStore.observe(url, features[7] ?? 0, features[6] > 0, score >= ML_THRESHOLD);
     }
 
-    // ── Check if lists would have caught this ─────────────────────────────
+    // â”€â”€ Check if lists would have caught this â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const listBlocks = await listManager.wouldBlock(url);
 
     if (score >= ML_THRESHOLD) {
@@ -220,8 +222,8 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
       await eventLogger.log({ url, features, prediction: score, decision: 'allow' });
     }
 
-    // ── Task 1: ML-only tracking ───────────────────────────────────────────
-    // inferMs guard already applied above — if we reach here, latency is OK
+    // â”€â”€ Task 1: ML-only tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // inferMs guard already applied above â€” if we reach here, latency is OK
     if (score >= ML_ONLY_THRESHOLD && !listBlocks && !isEssential) {
       await recordMlOnlyHit(url, type, tabId, initiator, score, features);
     }
@@ -231,14 +233,30 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
   }
 }
 
-// ─── Task 1: ML-only hit tracking with stabilization ─────────────────────────
+// â”€â”€â”€ Task 1: ML-only hit tracking with stabilization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+
+async function writeRiskSummary(tabId) {
+  try {
+    const risk = riskEngine.getPageRisk(tabId);
+    const key = isk_summary_${tabId};
+    await chrome.storage.session.set({
+      [key]: {
+        ...risk,
+        tabId,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (err) {
+    console.warn('[AdBlockML] writeRiskSummary error:', err);
+  }
+}
 async function recordMlOnlyHit(url, type, tabId, initiator, score, features) {
   // 15s page window guard
   const pageStart = tabStartTime.get(tabId);
   if (!pageStart || Date.now() - pageStart > PAGE_WINDOW_MS) return;
 
-  // Dedup: sync string key — no async needed, collision risk negligible at
+  // Dedup: sync string key â€” no async needed, collision risk negligible at
   // this scale (tabId scoping + 15s window means Set stays small)
   const requestKey = `${url}|${tabId}|${initiator}|${type}`;
   const seen = seenRequests.get(tabId) ?? new Set();
@@ -266,12 +284,25 @@ async function recordMlOnlyHit(url, type, tabId, initiator, score, features) {
   mlOnlyCount.set(tabId, count);
 
   // Task 3: write summary to session storage for popup
-  await writeMlSummary(tabId, count, mlOnlyEntry);
+  
+  if (features[25]) {
+    riskEngine.recordSignal(tabId, 'late_injection', true, { url, score, features });
+  }
 
-  console.debug(`[AdBlockML] ML-only hit #${count} (${confidence}): ${domain} — ${reason}`);
+  if (features[7] > 3.0 || features[8] > 3.0 || features[16] > 0) {
+    riskEngine.recordSignal(tabId, 'obfuscation', true, { url, score, features });
+  }
+
+  if (features[23] === 0) {
+    riskEngine.recordSignal(tabId, 'first_party_tracking', true, { url, score, features });
+  }
+await writeMlSummary(tabId, count, mlOnlyEntry);
+  await writeRiskSummary(tabId);
+
+  console.debug(`[AdBlockML] ML-only hit #${count} (${confidence}): ${domain} â€” ${reason}`);
 }
 
-// ─── Task 3: session storage pipeline ────────────────────────────────────────
+// â”€â”€â”€ Task 3: session storage pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function writeMlSummary(tabId, mlOnlyTotal, latestEntry) {
   try {
@@ -295,7 +326,7 @@ async function writeMlSummary(tabId, mlOnlyTotal, latestEntry) {
   }
 }
 
-// ─── Explanation tags (Task 5) ────────────────────────────────────────────────
+// â”€â”€â”€ Explanation tags (Task 5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Map the dominant feature signal into a human-readable reason tag.
@@ -311,7 +342,7 @@ async function writeMlSummary(tabId, mlOnlyTotal, latestEntry) {
 function deriveExplanationTag(features, url) {
   if (!features) return 'ml_pattern';
 
-  // Score each signal proportionally — highest wins (no arbitrary priority)
+  // Score each signal proportionally â€” highest wins (no arbitrary priority)
   // Feature indices from FEATURE_NAMES in classifier.js
   const u = url.toLowerCase();
   // Base scores: normalised signal strength [0, 1]
@@ -351,7 +382,7 @@ function deriveExplanationTag(features, url) {
   return scores[top] > 0 ? top : 'ml_pattern';
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getDomain(url) {
   try { return new URL(url).hostname.split('.').slice(-2).join('.'); }
@@ -359,7 +390,7 @@ function getDomain(url) {
 }
 
 
-// ─── Tab lifecycle ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tab lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupTabListeners() {
   chrome.tabs.onRemoved.addListener((tabId) => {
@@ -371,19 +402,26 @@ function setupTabListeners() {
     mlOnlyCount.delete(tabId);
     requestGraph.pruneTab(tabId);
     feedbackEng.onTabRemoved(tabId);
-    // Explicitly remove session storage — prevents unbounded growth on
+    // Explicitly remove session storage â€” prevents unbounded growth on
     // long sessions with many tab opens/closes
     chrome.storage.session.remove(`ml_summary_${tabId}`);
   });
 }
 
-// ─── Messages ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupMessageListeners() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
 
-      case 'GET_STATS': {
+            case 'GET_RISK': {
+        const tabId = message.tabId ?? sender.tab?.id;
+        const risk = riskEngine.getPageRisk(tabId);
+        const diagnostics = riskEngine.getDiagnostics(tabId);
+        sendResponse({ risk, diagnostics });
+        return false;
+      }
+case 'GET_STATS': {
         const tabId = message.tabId ?? sender.tab?.id;
         Promise.all([
           stats.getGlobalStats(),
@@ -401,7 +439,7 @@ function setupMessageListeners() {
         return true;
       }
 
-      // Task 6: allow a domain — remove block, reload tab
+      // Task 6: allow a domain â€” remove block, reload tab
       case 'ALLOWLIST_DOMAIN': {
         const { domain, tabId } = message;
         dynamicRules.removeBlock(`https://${domain}/`).then(async () => {
@@ -469,7 +507,7 @@ function setupMessageListeners() {
   });
 }
 
-// ─── In-extension benchmark (popup) ──────────────────────────────────────────
+// â”€â”€â”€ In-extension benchmark (popup) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function runBenchmark() {
   const recent = requestGraph.getRecentRequests(200);
@@ -492,5 +530,6 @@ async function runBenchmark() {
   return { total: recent.length, listBlocked, mlOnlyBlocked, mlFalsePositives };
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initialize().catch(console.error);
+
