@@ -1,4 +1,5 @@
-﻿/**
+﻿import { RiskEngine } from './risk-engine.js';
+/**
  * AdBlock ML â€” Service Worker v4
  *
  * What's new:
@@ -11,7 +12,6 @@
  *   - explanation tags derived from feature vector
  */
 
-import { RiskEngine } from './risk-engine.js';
 import { AdFlushClassifier }  from './classifier.js';
 import { RequestGraph }       from './request-graph.js';
 import { StatsTracker }       from './stats.js';
@@ -21,14 +21,12 @@ import { FeatureStore }       from './feature-store.js';
 import { EventLogger }        from './event-logger.js';
 import { FeedbackEngine }     from './feedback-engine.js';
 import { SyncLayer }          from './sync-layer.js';
-import { RiskEngine } from './risk-engine.js';
-import { RiskEngine } from "./risk-engine.js";`nimport { RuntimeConfig }      from './runtime-config.js';
 
 // â”€â”€â”€ Singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const config       = new RuntimeConfig();
-const riskEngine = new RiskEngine();
 const classifier   = new AdFlushClassifier();
+const riskEngine = new RiskEngine();
 const requestGraph = new RequestGraph();
 const stats        = new StatsTracker();
 const dynamicRules = new DynamicRuleManager();
@@ -36,8 +34,6 @@ const listManager  = new ListManager();
 const featureStore = new FeatureStore();
 const eventLogger  = new EventLogger();
 const feedbackEng  = new FeedbackEngine(eventLogger, dynamicRules);
-const riskEngine = new RiskEngine();`nconst syncLayer    = new SyncLayer(eventLogger, classifier);
-const riskEngine    = new RiskEngine();
 // â”€â”€â”€ Thresholds & constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ML_THRESHOLD       = 0.78;
@@ -100,8 +96,6 @@ function resetTabState(tabId, url) {
 
   requestGraph.newPage(tabId, url);
   stats.newPage(tabId, url);
-  riskEngine.resetTab(tabId);
-  riskEngine.resetTab(tabId);
   riskEngine.resetTab(tabId);
 }
 
@@ -242,7 +236,6 @@ async function classifyAsync(url, type, tabId, initiator, timestamp) {
 
 async function writeRiskSummary(tabId) {
   try {
-    const risk = riskEngine.getPageRisk(tabId);
     const key = isk_summary_${tabId};
     await chrome.storage.session.set({
       [key]: {
@@ -290,20 +283,14 @@ async function recordMlOnlyHit(url, type, tabId, initiator, score, features) {
   // Task 3: write summary to session storage for popup
   
   if (features[25]) {
-    riskEngine.recordSignal(tabId, 'late_injection', true, { url, score, features });
   }
 
   if (features[7] > 3.0 || features[8] > 3.0 || features[16] > 0) {
-    riskEngine.recordSignal(tabId, 'obfuscation', true, { url, score, features });
   }
 
   if (features[23] === 0) {
-    riskEngine.recordSignal(tabId, 'first_party_tracking', true, { url, score, features });
   }
   // Risk Engine Integration
-  if (features?.[25]) riskEngine.recordSignal(tabId, 'late_injection', true);
-  if ((features?.[7] > 3) || (features?.[8] > 3) || (features?.[16] > 0)) riskEngine.recordSignal(tabId, 'obfuscation', true);
-  if (features?.[23] === 0) riskEngine.recordSignal(tabId, 'first_party_tracking', true);
 
   await writeMlSummary(tabId, count, mlOnlyEntry);
   await writeRiskSummary(tabId);
@@ -426,14 +413,11 @@ function setupMessageListeners() {
 
             case 'GET_RISK': {
         const tabId = message.tabId ?? sender.tab?.id;
-        const risk = riskEngine.getPageRisk(tabId);
-        const diagnostics = riskEngine.getDiagnostics(tabId);
         sendResponse({ risk, diagnostics });
         return false;
       }
       case 'GET_RISK': {
         const tabId = message.tabId ?? sender.tab?.id;
-        sendResponse({ risk: riskEngine.getPageRisk(tabId) });
         return false;
       }
 
@@ -548,6 +532,7 @@ async function runBenchmark() {
 
 // â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initialize().catch(console.error);
+
 
 
 
