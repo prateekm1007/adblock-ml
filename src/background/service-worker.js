@@ -1,4 +1,14 @@
-﻿import { RiskEngine } from './risk-engine.js';
+﻿import { RiskEngine }       from './risk-engine.js';
+import { AdFlushClassifier }  from './classifier.js';
+import { RequestGraph }       from './request-graph.js';
+import { StatsTracker }       from './stats.js';
+import { DynamicRuleManager } from './dynamic-rules.js';
+import { ListManager }        from './list-manager.js';
+import { FeatureStore }       from './feature-store.js';
+import { EventLogger }        from './event-logger.js';
+import { FeedbackEngine }     from './feedback-engine.js';
+import { SyncLayer }          from './sync-layer.js';
+import { RuntimeConfig }      from './runtime-config.js';
 /**
  * AdBlock ML â€” Service Worker v4
  *
@@ -12,15 +22,6 @@
  *   - explanation tags derived from feature vector
  */
 
-import { AdFlushClassifier }  from './classifier.js';
-import { RequestGraph }       from './request-graph.js';
-import { StatsTracker }       from './stats.js';
-import { DynamicRuleManager } from './dynamic-rules.js';
-import { ListManager }        from './list-manager.js';
-import { FeatureStore }       from './feature-store.js';
-import { EventLogger }        from './event-logger.js';
-import { FeedbackEngine }     from './feedback-engine.js';
-import { SyncLayer }          from './sync-layer.js';
 
 // â”€â”€â”€ Singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -532,6 +533,7 @@ async function runBenchmark() {
 
 // â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initialize().catch(console.error);
+
 
 
 
