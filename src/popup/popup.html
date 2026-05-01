@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdBlock ML</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🛡</div>
+      <div>
+        <div class="logo-title">AdBlock ML</div>
+        <div class="logo-sub" id="classifier-status">Loading...</div>
+      </div>
+    </div>
+    <button class="toggle-btn" id="site-toggle" title="Toggle for this site">ON</button>
+  </div>
+
+  <!-- Task 4: ML-only banner — shown when ml_only_count >= 2 -->
+  <div class="ml-banner hidden" id="ml-banner">
+    <span class="ml-banner-icon">✦</span>
+    <span id="ml-banner-text">Advanced detection active</span>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="tab-blocked">—</div>
+      <div class="stat-label">Blocked this page</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="global-blocked">—</div>
+      <div class="stat-label">Blocked total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="ml-blocked">—</div>
+      <div class="stat-label">ML-only blocks</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="ml-rate">—</div>
+      <div class="stat-label">ML contribution</div>
+    </div>
+  </div>
+
+  <div class="section-title">Block source breakdown</div>
+  <div class="breakdown">
+    <div class="breakdown-row">
+      <span class="breakdown-label">Static lists (DNR)</span>
+      <div class="bar-wrap"><div class="bar" id="bar-dnr"></div></div>
+      <span class="breakdown-pct" id="pct-dnr">—</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="breakdown-label">ML classifier</span>
+      <div class="bar-wrap"><div class="bar bar-ml" id="bar-ml"></div></div>
+      <span class="breakdown-pct" id="pct-ml">—</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="breakdown-label">Dynamic cache</span>
+      <div class="bar-wrap"><div class="bar bar-cache" id="bar-cache"></div></div>
+      <span class="breakdown-pct" id="pct-cache">—</span>
+    </div>
+  </div>
+
+  <!-- Task 5: ML-only request details -->
+  <div class="section-title" id="ml-detail-title" style="display:none">
+    Advanced detections
+  </div>
+  <div class="ml-detail-list" id="ml-detail-list"></div>
+
+  <div class="section-title">Recent blocks (this page)</div>
+  <div class="recent-list" id="recent-list">
+    <div class="empty-state">No blocks yet on this page</div>
+  </div>
+
+  <!-- Feedback buttons -->
+  <div class="feedback-bar">
+    <span class="feedback-label">Correct?</span>
+    <button class="fb-btn fb-fp" id="btn-fp" title="We blocked something we shouldn't have">
+      Blocked incorrectly
+    </button>
+    <button class="fb-btn fb-fn" id="btn-fn" title="We missed a block">
+      Block missed
+    </button>
+  </div>
+
+  <div class="footer">
+    <button class="link-btn" id="run-benchmark">Run benchmark</button>
+    <span class="sep">·</span>
+    <button class="link-btn" id="clear-cache">Clear ML cache</button>
+    <span class="sep">·</span>
+    <span class="sync-badge" id="sync-badge" title="Events waiting to sync"></span>
+  </div>
+
+  <div id="benchmark-panel" class="benchmark-panel hidden">
+    <div class="section-title">Benchmark: ML vs Lists</div>
+    <div id="benchmark-results"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "_comment": "This file is a placeholder. Replace with the actual ONNX model produced by scripts/train_model.py",
+  "_instructions": [
+    "1. Install deps: pip install scikit-learn pandas numpy skl2onnx onnx",
+    "2. Run: python scripts/train_model.py --synthetic --output src/ml/model.onnx",
+    "3. The .onnx file goes in src/ml/ alongside this file",
+    "4. Also add vendor/ort.min.js from the onnxruntime-web npm package",
+    "5. Without the .onnx file, the extension uses the heuristic fallback (still works)"
+  ],
+  "model_type": "GradientBoostingClassifier",
+  "n_features": 27,
+  "threshold": 0.78,
+  "feature_names": [
+    "url_length", "path_depth", "query_param_count", "has_numeric_id",
+    "subdomain_depth", "ad_keyword_count", "has_tracker_param",
+    "path_entropy", "query_entropy", "domain_length", "is_cdn_domain", "tld_type",
+    "avg_identifier_length", "short_identifier_ratio", "bracket_dot_ratio",
+    "string_literal_density", "hex_literal_count", "max_brace_depth",
+    "eval_usage", "fetch_count_in_script", "beacon_count",
+    "initiator_depth", "sibling_request_count", "is_third_party",
+    "request_timing_zscore", "late_injection", "is_ml_eligible_type"
+  ],
+  "onnx_inputs": ["float_input"],
+  "onnx_outputs": ["output_label", "output_probability"],
+  "expected_size_kb": "80-150"
+}

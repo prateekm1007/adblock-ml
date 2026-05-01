@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "AdBlock ML",
+  "version": "0.1.0",
+  "description": "uBO-compatible blocking + AdFlush ML classifier for requests lists miss",
+
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "declarativeNetRequestWithHostAccess",
+    "storage",
+    "tabs",
+    "webNavigation",
+    "webRequest",
+    "scripting"
+  ],
+
+  "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/ablation-bridge.js", "src/content/cosmetic.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "AdBlock ML"
+  },
+
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "easylist",    "enabled": true, "path": "lists/easylist_dnr.json"    },
+      { "id": "easyprivacy", "enabled": true, "path": "lists/easyprivacy_dnr.json" }
+    ]
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/ml/model.onnx", "vendor/ort.min.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

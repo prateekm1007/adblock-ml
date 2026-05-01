@@ -1,0 +1,28 @@
+{
+  "name": "adblock-ml",
+  "version": "0.1.0",
+  "description": "uBO-compatible ad blocker with AdFlush ML classifier",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile-lists":   "python3 scripts/compile_lists.py",
+    "train":           "python3 scripts/train_model.py --synthetic --output src/ml/model.onnx",
+    "train-real":      "python3 scripts/train_model.py --data data/captured_requests.csv --output src/ml/model.onnx",
+    "train-pipeline":  "python3 scripts/train_pipeline.py",
+
+    "bench:setup":     "npx playwright install chromium",
+    "bench:dry":       "node benchmark/runner.js --dry-run",
+    "bench":           "node benchmark/runner.js",
+    "bench:fp":        "node benchmark/runner.js --categories first_party",
+    "bench:ablation":  "node benchmark/runner.js --conditions baseline,adblock-ml,ml-off,feature-store-off",
+    "bench:quick":     "node benchmark/runner.js --categories first_party,clean,standard_ads --runs 1",
+    "bench:full":      "node benchmark/runner.js --runs 3",
+    "bench:site":      "node benchmark/runner.js --site",
+    "bench:report":    "cat benchmark/results/latest.md"
+  },
+  "devDependencies": {
+    "playwright": "^1.44.0"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}

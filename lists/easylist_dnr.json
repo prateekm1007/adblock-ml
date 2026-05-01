@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||doubleclick.net^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||googlesyndication.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||googleadservices.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||adnxs.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||criteo.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 6,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||taboola.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||outbrain.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||scorecardresearch.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 9,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||amazon-adsystem.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  },
+  {
+    "id": 10,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||pubmatic.com^",
+      "resourceTypes": ["script","xmlhttprequest","image","sub_frame","media","other"]
+    }
+  }
+]
