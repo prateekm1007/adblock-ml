@@ -11,6 +11,7 @@
  *   - explanation tags derived from feature vector
  */
 
+import { RiskEngine } from './risk-engine.js';
 import { AdFlushClassifier }  from './classifier.js';
 import { RequestGraph }       from './request-graph.js';
 import { StatsTracker }       from './stats.js';
@@ -26,6 +27,7 @@ import { RiskEngine } from "./risk-engine.js";`nimport { RuntimeConfig }      fr
 // â”€â”€â”€ Singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const config       = new RuntimeConfig();
+const riskEngine = new RiskEngine();
 const classifier   = new AdFlushClassifier();
 const requestGraph = new RequestGraph();
 const stats        = new StatsTracker();
@@ -98,6 +100,7 @@ function resetTabState(tabId, url) {
 
   requestGraph.newPage(tabId, url);
   stats.newPage(tabId, url);
+  riskEngine.resetTab(tabId);
   riskEngine.resetTab(tabId);
   riskEngine.resetTab(tabId);
 }
@@ -545,6 +548,7 @@ async function runBenchmark() {
 
 // â”€â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 initialize().catch(console.error);
+
 
 
 
