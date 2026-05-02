@@ -1,14 +1,5 @@
-/**
+﻿/**
  * RequestGraph
- *
- * Maintains a sliding window of requests per tab.
- * Used by the classifier for graph-level features:
- *   - initiator chain depth
- *   - sibling request count
- *   - timing anomalies
- *   - late-injection detection
- *
- * Memory budget: ~500 requests per tab, evict oldest when full.
  */
 
 const MAX_REQUESTS_PER_TAB = 500;
@@ -16,11 +7,9 @@ const MAX_RECENT_GLOBAL    = 1000;
 
 export class RequestGraph {
   constructor() {
-    this._pages  = new Map();   // tabId → PageContext
-    this._recent = [];          // Global sliding window for benchmark
+    this._pages  = new Map();
+    this._recent = [];
   }
-
-  // ─── Page lifecycle ────────────────────────────────────────────────────────
 
   newPage(tabId, url) {
     this._pages.set(tabId, {
@@ -37,16 +26,12 @@ export class RequestGraph {
     return this._pages.get(tabId);
   }
 
-  // ─── Request recording ─────────────────────────────────────────────────────
-
   recordRequest({ requestId, url, type, tabId, initiator, timestamp }) {
     const page  = this._getOrCreate(tabId);
     const entry = { requestId, url, type, initiator, timestamp, status: 'pending' };
-
     if (page.requests.length >= MAX_REQUESTS_PER_TAB) page.requests.shift();
     page.requests.push(entry);
     if (initiator) page.initiatorMap[url] = initiator;
-
     this._recent.push(entry);
     if (this._recent.length > MAX_RECENT_GLOBAL) this._recent.shift();
   }
@@ -60,7 +45,6 @@ export class RequestGraph {
   }
 
   _patchRecent(requestId, updates) {
-    // Scan from end — most recent match is the right one
     for (let i = this._recent.length - 1; i >= 0; i--) {
       if (this._recent[i].requestId === requestId) {
         Object.assign(this._recent[i], updates);
@@ -68,8 +52,6 @@ export class RequestGraph {
       }
     }
   }
-
-  // ─── Queries ───────────────────────────────────────────────────────────────
 
   getPageContext(tabId) {
     return this._pages.get(tabId) ?? {

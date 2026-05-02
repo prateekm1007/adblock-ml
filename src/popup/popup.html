@@ -9,7 +9,7 @@
 <body>
   <div class="header">
     <div class="logo">
-      <div class="logo-icon">🛡</div>
+      <div class="logo-icon">🛡️</div>
       <div>
         <div class="logo-title">AdBlock ML</div>
         <div class="logo-sub" id="classifier-status">Loading...</div>
@@ -26,19 +26,19 @@
 
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-value" id="tab-blocked">—</div>
+      <div class="stat-value" id="blocked-page">—</div>
       <div class="stat-label">Blocked this page</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value" id="global-blocked">—</div>
+      <div class="stat-value" id="blocked-total">—</div>
       <div class="stat-label">Blocked total</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value" id="ml-blocked">—</div>
+      <div class="stat-value" id="ml-only">—</div>
       <div class="stat-label">ML-only blocks</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value" id="ml-rate">—</div>
+      <div class="stat-value" id="ml-contribution">—</div>
       <div class="stat-label">ML contribution</div>
     </div>
   </div>
@@ -64,7 +64,7 @@
 
   <!-- Task 5: ML-only request details -->
   <div class="section-title" id="ml-detail-title" style="display:none">
-    Advanced detections
+    ML-only blocks (lists missed these)
   </div>
   <div class="ml-detail-list" id="ml-detail-list"></div>
 

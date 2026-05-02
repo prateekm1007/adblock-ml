@@ -1,0 +1,36 @@
+﻿PATCH 1: classifier.js line ~85
+FIND:
+  async _loadOnnxModel() {
+    // onnxruntime-web must be bundled or loaded as a module
+    // During development, use the heuristic until model is trained
+    const { InferenceSession, Tensor } = await import(
+      chrome.runtime.getURL('vendor/ort.min.js')
+    );
+
+REPLACE WITH:
+  async _loadOnnxModel() {
+    throw new Error('ONNX disabled - import() not allowed in Service Worker');
+  }
+
+PATCH 2: event-logger.js line ~1
+FIND:
+  const DB_VERSION = 1;
+
+REPLACE WITH:
+  const DB_VERSION = 4;
+
+PATCH 3: service-worker.js line ~70
+FIND:
+  syncLayer.start();
+
+REPLACE WITH:
+  // syncLayer.start(); // TODO: implement syncLayer
+
+PATCH 4: service-worker.js (ALL OCCURRENCES)
+FIND:
+  ```ml_summary_${tabId}```
+
+REPLACE WITH:
+  `ml_summary_${tabId}`
+
+(use normal backticks, not triple backticks)

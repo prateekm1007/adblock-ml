@@ -1,20 +1,9 @@
-/**
+﻿/**
  * RuntimeConfig
- *
- * Manages feature flags for benchmark ablation testing.
- * In production all flags are ON. The benchmark runner injects flags
- * via localStorage before page load; a content script reads them and
- * sends them to the service worker via a one-time message.
- *
- * Supported flags:
- *   ml_enabled           (default: true)  — run ML classifier
- *   feature_store_enabled (default: true) — use domain history for safe-domain gate
- *
- * The service worker calls RuntimeConfig.get() synchronously on every
- * request. No async needed after initialization.
  */
 
-const STORAGE_KEY    = 'adblock_ml_runtime_flags';
+const STORAGE_KEY = 'adblock_ml_runtime_config';
+
 const DEFAULTS = {
   ml_enabled:            true,
   feature_store_enabled: true,
@@ -35,14 +24,12 @@ export class RuntimeConfig {
     } catch { /* first run */ }
   }
 
-  /** Called by the SET_RUNTIME_FLAGS message handler */
   async set(flags) {
     Object.assign(this._flags, flags);
     await chrome.storage.session.set({ [STORAGE_KEY]: this._flags });
     console.log('[RuntimeConfig] Flags updated:', this._flags);
   }
 
-  /** Reset to production defaults */
   async reset() {
     this._flags = { ...DEFAULTS };
     await chrome.storage.session.remove(STORAGE_KEY);

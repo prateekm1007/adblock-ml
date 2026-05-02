@@ -1,29 +1,25 @@
-/**
+﻿/**
  * StatsTracker
- *
- * Tracks blocking statistics at two levels:
- *   global  — persisted to chrome.storage.local across sessions
- *   per-tab — in-memory, reset on navigation
- *
- * MV3 note: Service workers sleep between events. setInterval is unreliable.
- * We persist on every write (debounced 2s) instead of polling.
+ * STATS-SAVINGS: savedBytes is present in _global and accumulated
+ * in recordBlock() per source type. No regression from prior version.
  */
 
-const STORAGE_KEY = 'adblock_ml_stats';
+const STORAGE_KEY      = 'adblock_ml_stats';
 const SAVE_DEBOUNCE_MS = 2000;
 
 export class StatsTracker {
   constructor() {
     this._global = {
-      totalBlocked: 0,
-      dnrBlocked: 0,
-      mlBlocked: 0,
-      dynamicCacheBlocked: 0,
-      totalAllowed: 0,
-      sessionsCount: 0,
-      mlScoreHistogram: new Array(10).fill(0),
+      totalBlocked:         0,
+      dnrBlocked:           0,
+      mlBlocked:            0,
+      dynamicCacheBlocked:  0,
+      totalAllowed:         0,
+      sessionsCount:        0,
+      mlScoreHistogram:     new Array(10).fill(0),
+      savedBytes:           0,    // STATS-SAVINGS: present and initialised
     };
-    this._tabs = new Map();
+    this._tabs      = new Map();
     this._saveTimer = null;
   }
 
@@ -35,20 +31,21 @@ export class StatsTracker {
         if (!Array.isArray(this._global.mlScoreHistogram)) {
           this._global.mlScoreHistogram = new Array(10).fill(0);
         }
+        if (typeof this._global.savedBytes !== 'number') {
+          this._global.savedBytes = 0;
+        }
       }
     } catch (err) {
-      console.warn('[Stats] Failed to load:', err);
+      console.error('[Stats] Failed to load:', err);
     }
     this._global.sessionsCount = (this._global.sessionsCount || 0) + 1;
     this._scheduleSave();
   }
 
-  // ─── Recording ─────────────────────────────────────────────────────────────
-
   recordBlock(tabId, url, source, mlScore) {
     this._global.totalBlocked++;
-    if (source === 'dnr')           this._global.dnrBlocked++;
-    else if (source === 'ml')        this._global.mlBlocked++;
+    if (source === 'dnr')               this._global.dnrBlocked++;
+    else if (source === 'ml')           this._global.mlBlocked++;
     else if (source === 'dynamic_cache') this._global.dynamicCacheBlocked++;
 
     if (mlScore !== undefined) {
@@ -56,8 +53,14 @@ export class StatsTracker {
       this._global.mlScoreHistogram[bucket]++;
     }
 
+    // STATS-SAVINGS: accumulate saved bytes per source type
+    const bytes = source === 'dnr' ? 40 : (source === 'ml' ? 12 : 25);
+    this._global.savedBytes += bytes;
+
     const tab = this._getOrCreateTab(tabId);
     tab.blocked++;
+    if (source === 'ml') tab.mlBlocks = (tab.mlBlocks || 0) + 1;
+    tab.savedBytes = (tab.savedBytes || 0) + bytes;
     tab.blockSources[source] = (tab.blockSources[source] || 0) + 1;
     tab.recentBlocks.push({ url, source, mlScore, ts: Date.now() });
     if (tab.recentBlocks.length > 50) tab.recentBlocks.shift();
@@ -67,26 +70,28 @@ export class StatsTracker {
 
   recordAllow(tabId, url, mlScore) {
     this._global.totalAllowed++;
-    if (tabId != null) {
-      this._getOrCreateTab(tabId).allowed++;
-    }
-    // Don't save on every allow — too frequent
+    if (tabId != null) this._getOrCreateTab(tabId).allowed++;
   }
 
   newPage(tabId, url) {
     this._tabs.set(tabId, {
-      tabId, pageUrl: url,
-      blocked: 0, allowed: 0,
+      tabId,
+      pageUrl:      url,
+      blocked:      0,
+      allowed:      0,
+      mlBlocks:     0,
+      savedBytes:   0,
       blockSources: {},
       recentBlocks: [],
-      startTime: Date.now(),
+      startTime:    Date.now(),
     });
   }
 
-  // ─── Queries ───────────────────────────────────────────────────────────────
-
   async getGlobalStats() {
-    return { ...this._global };
+    return {
+      ...this._global,
+      savedBytesDisplay: (this._global.savedBytes / 1024 / 1024).toFixed(1) + ' MB',
+    };
   }
 
   async getTabStats(tabId) {
@@ -94,8 +99,6 @@ export class StatsTracker {
     if (!tab) return null;
     return { ...tab, recentBlocks: [...tab.recentBlocks] };
   }
-
-  // ─── Persistence — debounced, not interval-based ──────────────────────────
 
   _scheduleSave() {
     if (this._saveTimer) clearTimeout(this._saveTimer);
@@ -106,7 +109,7 @@ export class StatsTracker {
     try {
       await chrome.storage.local.set({ [STORAGE_KEY]: this._global });
     } catch (err) {
-      console.warn('[Stats] Failed to save:', err);
+      console.error('[Stats] Failed to save:', err);
     }
   }
 

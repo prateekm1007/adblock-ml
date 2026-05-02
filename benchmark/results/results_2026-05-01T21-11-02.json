@@ -1,0 +1,299 @@
+{
+  "timestamp": "2026-05-01T21:06:17.179Z",
+  "categories": {
+    "standard_ads": [
+      {
+        "url": "https://www.cnn.com",
+        "block_rate": 0,
+        "tracker_block_rate": 0.36363636363636365,
+        "breakage_score": 0.4179544706490855,
+        "baseline": {
+          "url": "https://www.cnn.com",
+          "useExtension": false,
+          "totalRequests": 206,
+          "blockedRequests": 0,
+          "totalTrackers": 27,
+          "blockedTrackers": 0,
+          "jsErrors": 1,
+          "domNodes": 3631,
+          "failedRequests": 0,
+          "loadTime": 22720
+        },
+        "withExtension": {
+          "url": "https://www.cnn.com",
+          "useExtension": true,
+          "totalRequests": 164,
+          "blockedRequests": 0,
+          "totalTrackers": 11,
+          "blockedTrackers": 4,
+          "jsErrors": 17,
+          "domNodes": 3623,
+          "failedRequests": 14,
+          "loadTime": 15954
+        }
+      },
+      {
+        "url": "https://www.dailymail.co.uk",
+        "block_rate": 0,
+        "tracker_block_rate": 0,
+        "breakage_score": 0.2,
+        "baseline": {
+          "url": "https://www.dailymail.co.uk",
+          "useExtension": false,
+          "totalRequests": 1,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 0,
+          "domNodes": 0,
+          "failedRequests": 1,
+          "loadTime": 0,
+          "error": "page.goto: net::ERR_CONNECTION_TIMED_OUT at https://www.dailymail.co.uk/\nCall log:\n\u001b[2m  - navigating to \"https://www.dailymail.co.uk/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+        },
+        "withExtension": {
+          "url": "https://www.dailymail.co.uk",
+          "useExtension": true,
+          "totalRequests": 1,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 0,
+          "domNodes": 0,
+          "failedRequests": 1,
+          "loadTime": 0,
+          "error": "page.goto: net::ERR_CONNECTION_TIMED_OUT at https://www.dailymail.co.uk/\nCall log:\n\u001b[2m  - navigating to \"https://www.dailymail.co.uk/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+        }
+      }
+    ],
+    "native_ads": [
+      {
+        "url": "https://www.reddit.com",
+        "block_rate": 0,
+        "tracker_block_rate": 0,
+        "breakage_score": 0.6627450980392157,
+        "baseline": {
+          "url": "https://www.reddit.com",
+          "useExtension": false,
+          "totalRequests": 2,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 1,
+          "domNodes": 17,
+          "failedRequests": 0,
+          "loadTime": 3242
+        },
+        "withExtension": {
+          "url": "https://www.reddit.com",
+          "useExtension": true,
+          "totalRequests": 3,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 2,
+          "domNodes": 31,
+          "failedRequests": 2,
+          "loadTime": 3339
+        }
+      },
+      {
+        "url": "https://www.forbes.com",
+        "block_rate": 0,
+        "tracker_block_rate": 1,
+        "breakage_score": 0.4430457460879982,
+        "baseline": {
+          "url": "https://www.forbes.com",
+          "useExtension": false,
+          "totalRequests": 103,
+          "blockedRequests": 0,
+          "totalTrackers": 16,
+          "blockedTrackers": 0,
+          "jsErrors": 6,
+          "domNodes": 2357,
+          "failedRequests": 0,
+          "loadTime": 6987
+        },
+        "withExtension": {
+          "url": "https://www.forbes.com",
+          "useExtension": true,
+          "totalRequests": 85,
+          "blockedRequests": 0,
+          "totalTrackers": 3,
+          "blockedTrackers": 3,
+          "jsErrors": 15,
+          "domNodes": 2472,
+          "failedRequests": 10,
+          "loadTime": 7308
+        }
+      },
+      {
+        "url": "https://www.twitch.tv",
+        "block_rate": 0,
+        "tracker_block_rate": 0,
+        "breakage_score": 0.6550166637920004,
+        "baseline": {
+          "url": "https://www.twitch.tv",
+          "useExtension": false,
+          "totalRequests": 170,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 1,
+          "domNodes": 941,
+          "failedRequests": 2,
+          "loadTime": 5893
+        },
+        "withExtension": {
+          "url": "https://www.twitch.tv",
+          "useExtension": true,
+          "totalRequests": 191,
+          "blockedRequests": 0,
+          "totalTrackers": 1,
+          "blockedTrackers": 0,
+          "jsErrors": 3,
+          "domNodes": 1536,
+          "failedRequests": 2,
+          "loadTime": 10006
+        }
+      }
+    ],
+    "anti_adblock": [
+      {
+        "url": "https://www.wired.com",
+        "block_rate": 0,
+        "tracker_block_rate": 0.5,
+        "breakage_score": 0.013175051585647614,
+        "baseline": {
+          "url": "https://www.wired.com",
+          "useExtension": false,
+          "totalRequests": 127,
+          "blockedRequests": 0,
+          "totalTrackers": 8,
+          "blockedTrackers": 1,
+          "jsErrors": 9,
+          "domNodes": 1963,
+          "failedRequests": 5,
+          "loadTime": 9631
+        },
+        "withExtension": {
+          "url": "https://www.wired.com",
+          "useExtension": true,
+          "totalRequests": 99,
+          "blockedRequests": 0,
+          "totalTrackers": 2,
+          "blockedTrackers": 1,
+          "jsErrors": 4,
+          "domNodes": 1938,
+          "failedRequests": 4,
+          "loadTime": 11416
+        }
+      },
+      {
+        "url": "https://www.businessinsider.com",
+        "block_rate": 0,
+        "tracker_block_rate": 1,
+        "breakage_score": 0.44529791596535795,
+        "baseline": {
+          "url": "https://www.businessinsider.com",
+          "useExtension": false,
+          "totalRequests": 79,
+          "blockedRequests": 0,
+          "totalTrackers": 12,
+          "blockedTrackers": 0,
+          "jsErrors": 1,
+          "domNodes": 1594,
+          "failedRequests": 0,
+          "loadTime": 5130
+        },
+        "withExtension": {
+          "url": "https://www.businessinsider.com",
+          "useExtension": true,
+          "totalRequests": 41,
+          "blockedRequests": 0,
+          "totalTrackers": 4,
+          "blockedTrackers": 4,
+          "jsErrors": 6,
+          "domNodes": 1569,
+          "failedRequests": 8,
+          "loadTime": 6187
+        }
+      }
+    ],
+    "clean": [
+      {
+        "url": "https://github.com",
+        "block_rate": 0,
+        "tracker_block_rate": 0,
+        "breakage_score": 0.0037422037422037424,
+        "baseline": {
+          "url": "https://github.com",
+          "useExtension": false,
+          "totalRequests": 138,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 0,
+          "domNodes": 1924,
+          "failedRequests": 0,
+          "loadTime": 9486
+        },
+        "withExtension": {
+          "url": "https://github.com",
+          "useExtension": true,
+          "totalRequests": 135,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 0,
+          "domNodes": 1906,
+          "failedRequests": 0,
+          "loadTime": 13422
+        }
+      },
+      {
+        "url": "https://stackoverflow.com",
+        "block_rate": 0,
+        "tracker_block_rate": 0,
+        "breakage_score": 0.5333333333333333,
+        "baseline": {
+          "url": "https://stackoverflow.com",
+          "useExtension": false,
+          "totalRequests": 12,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 2,
+          "domNodes": 45,
+          "failedRequests": 0,
+          "loadTime": 3711
+        },
+        "withExtension": {
+          "url": "https://stackoverflow.com",
+          "useExtension": true,
+          "totalRequests": 10,
+          "blockedRequests": 0,
+          "totalTrackers": 0,
+          "blockedTrackers": 0,
+          "jsErrors": 3,
+          "domNodes": 0,
+          "failedRequests": 0,
+          "loadTime": 0,
+          "error": "page.waitForTimeout: Target page, context or browser has been closed"
+        }
+      }
+    ]
+  },
+  "summary": {
+    "block_rate": 0,
+    "tracker_block_rate": 0.3181818181818182,
+    "breakage_score": 0.3749233870216491,
+    "ml_contribution": 0
+  },
+  "thresholdCheck": {
+    "pass": false,
+    "failures": [
+      "breakage_score 0.375 > 0.05 (limit)",
+      "ml_contribution 0.0% < 5% (required on native_ads)"
+    ]
+  }
+}

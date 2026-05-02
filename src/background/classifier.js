@@ -1,156 +1,80 @@
-/**
- * AdFlush-style request classifier
- *
- * Feature engineering follows the AdFlush paper (2024):
- *   "AdFlush: Leveraging JS AST and Request Graph for Ad Filtering"
- *   F1 ≈ 0.975, 56% less CPU than graph-only models
- *
- * Implementation uses a GBM model exported to ONNX and run via
- * onnxruntime-web. Falls back to heuristic scoring if model unavailable.
- *
- * Total overhead target: <5ms per request on median hardware.
+﻿/**
+ * AdFlushClassifier
+ * Feature engineering follows the AdFlush paper (2024).
+ * Falls back to heuristic scoring if ONNX model unavailable.
  */
 
-// Feature indices — must match training feature order
 const FEATURE_NAMES = [
-  // URL features (12)
-  'url_length',
-  'path_depth',
-  'query_param_count',
-  'has_numeric_id',
-  'subdomain_depth',
-  'ad_keyword_count',
-  'has_tracker_param',
-  'path_entropy',
-  'query_entropy',
-  'domain_length',
-  'is_cdn_domain',
-  'tld_type',
-
-  // JS AST approximation features (9)
-  'avg_identifier_length',
-  'short_identifier_ratio',
-  'bracket_dot_ratio',
-  'string_literal_density',
-  'hex_literal_count',
-  'max_brace_depth',
-  'eval_usage',
-  'fetch_count_in_script',
-  'beacon_count',
-
-  // Request graph features (6)
-  'initiator_depth',
-  'sibling_request_count',
-  'is_third_party',
-  'request_timing_zscore',
-  'late_injection',
-  'is_ml_eligible_type',
+  'url_length', 'path_depth', 'query_param_count', 'has_numeric_id',
+  'subdomain_depth', 'ad_keyword_count', 'has_tracker_param',
+  'path_entropy', 'query_entropy', 'domain_length', 'is_cdn_domain', 'tld_type',
+  'avg_identifier_length', 'short_identifier_ratio', 'bracket_dot_ratio',
+  'string_literal_density', 'hex_literal_count', 'max_brace_depth',
+  'eval_usage', 'fetch_count_in_script', 'beacon_count',
+  'initiator_depth', 'sibling_request_count', 'is_third_party',
+  'request_timing_zscore', 'late_injection', 'is_ml_eligible_type',
 ];
 
 const N_FEATURES = FEATURE_NAMES.length;
 
-// Known ad/tracker keywords for URL scanning
 const AD_KEYWORDS = new Set([
   'ad', 'ads', 'advert', 'advertisement', 'banner', 'sponsor',
   'tracking', 'analytics', 'pixel', 'beacon', 'doubleclick',
   'adsystem', 'adserver', 'pagead', 'adunit', 'prebid', 'dfp',
   'adsense', 'adroll', 'criteo', 'taboola', 'outbrain', 'mgid',
   'quantserve', 'scorecardresearch', 'rubiconproject', 'openx',
+  'collect', 'telemetry', 'measure', 'event', 'track', 'log',
 ]);
 
 const TRACKER_PARAMS = new Set([
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
   'fbclid', 'gclid', 'msclkid', 'ttclid', '_ga', 'mc_eid',
   'ref', 'affiliate_id', 'aff_id', 'clickid',
+  'tid', 'uid', 'cid', 'aid', 'vid', 'sid', 'user_id', 'session_id',
+  'gtag', 'ga_id', 'ga4', 'mp_lib', 'v', 'z',
 ]);
 
 const CDN_PATTERNS = ['cdn', 'static', 'assets', 'media', 'img', 'files', 'cache'];
 
 export class AdFlushClassifier {
   constructor() {
-    this._session = null;      // ONNX InferenceSession
-    this._ready = false;
-    this._modelInfo = { type: 'none', features: N_FEATURES };
-    this._cache = new Map();   // LRU cache: url → score
+    this._session     = null;
+    this._ready       = false;
+    this._modelInfo   = { type: 'none', features: N_FEATURES };
+    this._cache       = new Map();
     this._cacheMaxSize = 2000;
   }
 
-  // ─── Lifecycle ─────────────────────────────────────────────────────────────
-
   async load() {
-    try {
-      // Try loading ONNX model (produced by training script)
-      await this._loadOnnxModel();
-    } catch (err) {
-      console.warn('[Classifier] ONNX load failed, using heuristic fallback:', err.message);
-      this._modelInfo = { type: 'heuristic', features: N_FEATURES };
-      this._ready = true; // Heuristic always works
-    }
-  }
-
-  async _loadOnnxModel() {
-    // onnxruntime-web must be bundled or loaded as a module
-    // During development, use the heuristic until model is trained
-    const { InferenceSession, Tensor } = await import(
-      chrome.runtime.getURL('vendor/ort.min.js')
-    );
-
-    const modelUrl = chrome.runtime.getURL('src/ml/model.onnx');
-    this._session = await InferenceSession.create(modelUrl, {
-      executionProviders: ['wasm'], // WebGPU when available: ['webgpu', 'wasm']
-      graphOptimizationLevel: 'all',
-    });
-
-    this._ort = { Tensor };
-    this._modelInfo = { type: 'onnx_gbm', features: N_FEATURES };
+    console.warn('[Classifier] ONNX disabled (import() forbidden in Service Worker), using heuristic fallback');
+    this._modelInfo = { type: 'heuristic', features: N_FEATURES };
     this._ready = true;
-    console.log('[Classifier] ONNX model loaded successfully');
   }
 
-  isReady() { return this._ready; }
+  isReady()      { return this._ready; }
   getModelInfo() { return { ...this._modelInfo, cacheSize: this._cache.size }; }
 
-  // ─── Main scoring entry point ──────────────────────────────────────────────
-
-  /**
-   * Score a request. Returns probability [0, 1] that it's an ad/tracker.
-   * @param {{ url, type, initiator, timestamp, pageContext }} request
-   */
   async score(request) {
     const cacheKey = `${request.url}:${request.type}`;
-    if (this._cache.has(cacheKey)) {
-      return this._cache.get(cacheKey);
-    }
-
+    if (this._cache.has(cacheKey)) return this._cache.get(cacheKey);
     const features = this.extractFeatures(request);
-    let score;
-
-    if (this._session) {
-      score = await this._onnxInfer(features);
-    } else {
-      score = this._heuristicScore(features, request.url);
-    }
-
+    const score    = this._heuristicScore(features, request.url);
     this._cacheSet(cacheKey, score);
     return score;
   }
-
-  // ─── Feature Extraction ────────────────────────────────────────────────────
 
   extractFeatures(request) {
     const { url, type, initiator = '', timestamp, pageContext = {} } = request;
     const features = new Float32Array(N_FEATURES);
 
-    // Parse URL once
     let parsed;
     try { parsed = new URL(url); }
-    catch { return features; } // malformed URL → zero features → low score
+    catch { return features; }
 
-    const path = parsed.pathname;
-    const query = parsed.search.slice(1); // remove leading ?
+    const path     = parsed.pathname;
+    const query    = parsed.search.slice(1);
     const hostname = parsed.hostname;
 
-    // ── URL features ──
     features[0]  = Math.min(url.length, 500);
     features[1]  = (path.match(/\//g) || []).length;
     features[2]  = query ? query.split('&').length : 0;
@@ -164,21 +88,17 @@ export class AdFlushClassifier {
     features[10] = CDN_PATTERNS.some(p => hostname.includes(p)) ? 1 : 0;
     features[11] = this._tldType(hostname);
 
-    // ── JS AST approximation features (only for scripts) ──
-    // We approximate from URL/initiator signals since we don't have source
-    // In a full implementation these come from webRequest.onBeforeRequest body
     const isScript = type === 'script';
     features[12] = isScript ? this._estimateIdentifierLength(url) : 0;
     features[13] = isScript ? this._estimateShortIdRatio(url) : 0;
     features[14] = this._bracketDotRatio(url);
-    features[15] = 0; // string density — needs actual script source
+    features[15] = 0;
     features[16] = (url.match(/0x[0-9a-fA-F]+/g) || []).length;
-    features[17] = 0; // brace depth — needs actual script source
-    features[18] = url.toLowerCase().includes('eval') ? 1 : 0;
-    features[19] = url.toLowerCase().includes('fetch') ? 1 : 0;
+    features[17] = 0;
+    features[18] = url.toLowerCase().includes('eval')   ? 1 : 0;
+    features[19] = url.toLowerCase().includes('fetch')  ? 1 : 0;
     features[20] = url.toLowerCase().includes('beacon') ? 1 : 0;
 
-    // ── Request graph features ──
     const allRequests = pageContext.requests || [];
     features[21] = this._initiatorDepth(initiator, pageContext);
     features[22] = this._siblingCount(initiator, allRequests);
@@ -190,52 +110,52 @@ export class AdFlushClassifier {
     return features;
   }
 
-  // ─── ONNX inference ────────────────────────────────────────────────────────
-
-  async _onnxInfer(features) {
-    const tensor = new this._ort.Tensor('float32', features, [1, N_FEATURES]);
-    const results = await this._session.run({ float_input: tensor });
-    // GBM exported via skl2onnx outputs probabilities in output_probability
-    const probs = results.output_probability?.data || results.probabilities?.data;
-    return probs ? probs[1] : 0.5; // index 1 = P(ad)
-  }
-
-  // ─── Heuristic fallback (no model) ────────────────────────────────────────
-
-  /**
-   * Deterministic heuristic scoring.
-   * Designed to approximate the ML model before it's trained.
-   * Based on known ad-network patterns + AdFlush feature importance.
-   */
   _heuristicScore(features, url) {
     let score = 0;
     const urlLower = url.toLowerCase();
 
-    // Strong signals (from AdFlush feature importance ranking)
-    if (features[5] >= 2) score += 0.35;        // Multiple ad keywords
-    else if (features[5] >= 1) score += 0.20;   // One ad keyword
+    if (features[5] >= 2)      score += 0.35;
+    else if (features[5] >= 1) score += 0.20;
 
-    if (features[6]) score += 0.20;              // Tracker params present
+    if (features[6]) score += 0.25;
+    if (/[?&](tid|uid|cid|aid|vid|sid|user_id|session_id)=/i.test(url)) score += 0.15;
+    if (/[?&](ga_id|ga4|mp_lib|gtag|z|v)=/i.test(url))                  score += 0.10;
 
-    if (features[23]) score += 0.10;             // Third-party
+    if (features[23]) score += 0.10;
+    if (features[7] > 3.5) score += 0.10;
 
-    if (features[7] > 3.5) score += 0.10;        // High path entropy (obfuscated)
-
-    if (features[1] <= 1 && features[5] === 0) score -= 0.10; // Simple clean path
-
-    // Domain-level known bad actors (supplement for heuristic mode)
     if (this._knownAdDomain(urlLower)) score += 0.40;
 
-    // Structural URL signals
-    if (/\/(ad|ads|advert|banner)\//i.test(url)) score += 0.25;
-    if (/\bpagead\b/i.test(url)) score += 0.35;
-    if (/\bdoubleclick\.net/i.test(url)) score += 0.50;
-    if (/googlesyndication\.com/i.test(url)) score += 0.50;
-    if (/\bpixel\b/i.test(url) && features[23]) score += 0.15;
+    if (/\/(collect|beacon|track|log|telemetry|measure|event|analytics)\//i.test(url)) {
+      score += features[23] ? 0.40 : 0.25;
+    }
 
-    // Obfuscation signals
-    if (features[16] > 2) score += 0.10;         // Hex literals in URL
-    if (features[8] > 4.0) score += 0.10;        // High query entropy
+    if (/google-analytics|googletagmanager|gtag|measurement|firebase|amplitude|mixpanel|segment|heap|fullstory|hotjar|chartbeat|newrelic|datadog|logrocket/i.test(url)) {
+      score += 0.40;
+    }
+
+    if (/facebook\.com|fbevents|pixel\.facebook|fbcdn\.net|instagram\.com.*pixel/i.test(url)) {
+      score += 0.40;
+    }
+
+    if (/\/(ad|ads|advert|banner|advertising)\//i.test(url)) score += 0.25;
+
+    if (/\bpagead\b/i.test(url))                score += 0.35;
+    if (/\bdoubleclick\.net/i.test(url))         score += 0.50;
+    if (/googlesyndication\.com/i.test(url))     score += 0.50;
+
+    if (/\b(pixel|beacon|1x1|clear\.gif|spacer\.gif)\b/i.test(url)) {
+      score += features[23] ? 0.20 : 0.10;
+    }
+
+    if (features[8] > 4.0) score += 0.10;
+    if (features[16] > 2)  score += 0.10;
+
+    if (/stripe|payment|checkout|paypal|square|braintree|authorize\.net/i.test(url)) score -= 0.15;
+    if (/^https:\/\/(cdn|static|assets|fonts|images|media)[\.-]/i.test(url))         score -= 0.10;
+    if (/github\.com|stackoverflow|wikipedia\.org|medium\.com|dev\.to/i.test(url))   score -= 0.10;
+
+    if (features[1] <= 1 && features[5] === 0 && score < 0.15) score = 0;
 
     return Math.max(0, Math.min(1, score));
   }
@@ -244,16 +164,20 @@ export class AdFlushClassifier {
     const knownDomains = [
       'doubleclick.net', 'googlesyndication.com', 'googletagmanager.com',
       'googletagservices.com', 'google-analytics.com', 'googleadservices.com',
-      'facebook.net/en_US/fbevents', 'connect.facebook.net',
+      'facebook.net/en_US/fbevents', 'connect.facebook.net', 'fbcdn.net',
+      'pixel.facebook.com', 'instagram.com/tr',
+      'amplitude.com', 'mixpanel.com', 'segment.io', 'segment.com',
+      'heap.io', 'fullstory.com', 'hotjar.com', 'chartbeat.com',
+      'newrelic.com', 'datadog.com', 'logrocket.io', 'sentry.io',
       'scorecardresearch.com', 'quantserve.com', 'moatads.com',
       'amazon-adsystem.com', 'advertising.com', 'adnxs.com',
       'rubiconproject.com', 'pubmatic.com', 'openx.net', 'openx.com',
       'criteo.com', 'criteo.net', 'taboola.com', 'outbrain.com',
+      'sharethrough.com', 'triplelift.com', 'lijit.com', 'sovrn.com',
+      'doubleverify.com', 'adsafeprotected.com', 'everesttech.net',
     ];
     return knownDomains.some(d => url.includes(d));
   }
-
-  // ─── Feature helpers ───────────────────────────────────────────────────────
 
   _entropy(str) {
     if (!str || str.length < 2) return 0;
@@ -289,29 +213,27 @@ export class AdFlushClassifier {
   }
 
   _estimateIdentifierLength(url) {
-    // Proxy: very short random-looking path segments suggest obfuscation
     const segments = url.split(/[/?=&]/);
-    const lengths = segments.filter(s => /^[a-zA-Z]/.test(s)).map(s => s.length);
+    const lengths  = segments.filter(s => /^[a-zA-Z]/.test(s)).map(s => s.length);
     return lengths.length ? lengths.reduce((a, b) => a + b, 0) / lengths.length : 0;
   }
 
   _estimateShortIdRatio(url) {
     const segments = url.split(/[/?=&]/);
-    const ids = segments.filter(s => /^[a-zA-Z]/.test(s));
+    const ids      = segments.filter(s => /^[a-zA-Z]/.test(s));
     if (!ids.length) return 0;
     return ids.filter(s => s.length <= 2).length / ids.length;
   }
 
   _bracketDotRatio(url) {
     const brackets = (url.match(/\[/g) || []).length;
-    const dots = (url.match(/\./g) || []).length;
+    const dots     = (url.match(/\./g) || []).length;
     return dots > 0 ? brackets / dots : 0;
   }
 
   _initiatorDepth(initiator, pageContext) {
     if (!initiator || !pageContext.initiatorMap) return 0;
-    let depth = 0;
-    let current = initiator;
+    let depth = 0, current = initiator;
     const visited = new Set();
     while (current && !visited.has(current) && depth < 10) {
       visited.add(current);
@@ -328,7 +250,7 @@ export class AdFlushClassifier {
 
   _isThirdParty(url, pageUrl) {
     try {
-      const reqBase = new URL(url).hostname.split('.').slice(-2).join('.');
+      const reqBase  = new URL(url).hostname.split('.').slice(-2).join('.');
       const pageBase = new URL(pageUrl).hostname.split('.').slice(-2).join('.');
       return reqBase !== pageBase;
     } catch { return false; }
@@ -336,10 +258,10 @@ export class AdFlushClassifier {
 
   _timingZScore(timestamp, allRequests) {
     if (!timestamp || allRequests.length < 3) return 0;
-    const times = allRequests.map(r => r.timestamp).filter(Boolean);
-    const mean = times.reduce((a, b) => a + b, 0) / times.length;
+    const times    = allRequests.map(r => r.timestamp).filter(Boolean);
+    const mean     = times.reduce((a, b) => a + b, 0) / times.length;
     const variance = times.reduce((a, b) => a + (b - mean) ** 2, 0) / times.length;
-    const std = Math.sqrt(variance);
+    const std      = Math.sqrt(variance);
     return std > 0 ? Math.abs((timestamp - mean) / std) : 0;
   }
 
@@ -348,49 +270,18 @@ export class AdFlushClassifier {
     return timestamp > pageContext.domContentLoaded + 500;
   }
 
-  // ─── Cache (simple LRU) ────────────────────────────────────────────────────
-
   _cacheSet(key, value) {
     if (this._cache.size >= this._cacheMaxSize) {
-      // Evict oldest entry
       this._cache.delete(this._cache.keys().next().value);
     }
     this._cache.set(key, value);
   }
-  /**
-   * Score from a pre-extracted feature vector (avoids double extraction).
-   * Call extractFeatures() first, pass result here.
-   */
-  async scoreFromFeatures(features) {
-    const cacheKey = features.join(',').slice(0, 60);
+
+  async scoreFromFeatures(features, url = '') {
+    const cacheKey = url ? url.slice(0, 80) : features.join(',').slice(0, 60);
     if (this._cache.has(cacheKey)) return this._cache.get(cacheKey);
-    const score = this._session
-      ? await this._onnxInfer(features)
-      : this._heuristicScore(features, '');
+    const score = this._heuristicScore(features, url);
     this._cacheSet(cacheKey, score);
     return score;
   }
-
-  /**
-   * Hot-swap the ONNX model from an ArrayBuffer.
-   * Called by SyncLayer after downloading + validating a new model.
-   */
-  async loadFromBuffer(buffer, meta) {
-    try {
-      const { InferenceSession, Tensor } = await import(
-        chrome.runtime.getURL('vendor/ort.min.js')
-      );
-      this._session   = await InferenceSession.create(buffer, {
-        executionProviders: ['wasm'],
-        graphOptimizationLevel: 'all',
-      });
-      this._ort       = { Tensor };
-      this._modelInfo = { type: 'onnx_gbm', features: N_FEATURES, version: meta?.version ?? 'unknown' };
-      this._cache.clear(); // invalidate old scores
-      console.log('[Classifier] Hot-swapped to model v' + (meta?.version ?? '?'));
-    } catch (err) {
-      console.warn('[Classifier] Hot-swap failed:', err.message);
-    }
-  }
-
 }

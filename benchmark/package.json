@@ -1,0 +1,12 @@
+{
+  "name": "adblockml-benchmark",
+  "version": "1.0.0",
+  "description": "Automated benchmark for AdBlockML extension",
+  "main": "runner.js",
+  "scripts": {
+    "test": "node runner.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
