@@ -458,6 +458,18 @@ function setupMessageListeners() {
 
         return true;
       }
+      case 'ALLOW_DOMAIN': {
+        const domain = message.domain;
+        if (domain) {
+          dynamicRules.enableSite(domain).then(() => {
+            console.log('[AdBlockML] Allowed domain:', domain);
+            sendResponse({ ok: true });
+          });
+        } else {
+          sendResponse({ ok: false });
+        }
+        return true;
+      }
 
       default:
         sendResponse({ ok: true });
@@ -495,3 +507,4 @@ setupTabListeners();
 setupWebRequestListeners();
 
 initialize().catch(console.error);
+

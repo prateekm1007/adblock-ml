@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -12,13 +12,12 @@
       <div class="logo-icon">🛡️</div>
       <div>
         <div class="logo-title">AdBlock ML</div>
-        <div class="logo-sub" id="classifier-status">Loading...</div>
+        <div class="logo-sub">Advanced protection active</div>
       </div>
     </div>
-    <button class="toggle-btn" id="site-toggle" title="Toggle for this site">ON</button>
   </div>
 
-  <!-- Task 4: ML-only banner — shown when ml_only_count >= 2 -->
+  <!-- PROOF ENGINE: Hero Banner -->
   <div class="ml-banner hidden" id="ml-banner">
     <span class="ml-banner-icon">✦</span>
     <span id="ml-banner-text">Advanced detection active</span>
@@ -31,11 +30,11 @@
     </div>
     <div class="stat-card">
       <div class="stat-value" id="blocked-total">—</div>
-      <div class="stat-label">Blocked total</div>
+      <div class="stat-label">Total blocked</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="ml-only">—</div>
-      <div class="stat-label">ML-only blocks</div>
+      <div class="stat-label">Trackers lists missed</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="ml-contribution">—</div>
@@ -46,12 +45,12 @@
   <div class="section-title">Block source breakdown</div>
   <div class="breakdown">
     <div class="breakdown-row">
-      <span class="breakdown-label">Static lists (DNR)</span>
+      <span class="breakdown-label">Standard filters</span>
       <div class="bar-wrap"><div class="bar" id="bar-dnr"></div></div>
       <span class="breakdown-pct" id="pct-dnr">—</span>
     </div>
     <div class="breakdown-row">
-      <span class="breakdown-label">ML classifier</span>
+      <span class="breakdown-label">Advanced detection</span>
       <div class="bar-wrap"><div class="bar bar-ml" id="bar-ml"></div></div>
       <span class="breakdown-pct" id="pct-ml">—</span>
     </div>
@@ -62,39 +61,15 @@
     </div>
   </div>
 
-  <!-- Task 5: ML-only request details -->
+  <!-- PROOF ENGINE: ML-only details with explanations + allow -->
   <div class="section-title" id="ml-detail-title" style="display:none">
-    ML-only blocks (lists missed these)
+    Trackers blocked by advanced detection
   </div>
   <div class="ml-detail-list" id="ml-detail-list"></div>
 
   <div class="section-title">Recent blocks (this page)</div>
   <div class="recent-list" id="recent-list">
     <div class="empty-state">No blocks yet on this page</div>
-  </div>
-
-  <!-- Feedback buttons -->
-  <div class="feedback-bar">
-    <span class="feedback-label">Correct?</span>
-    <button class="fb-btn fb-fp" id="btn-fp" title="We blocked something we shouldn't have">
-      Blocked incorrectly
-    </button>
-    <button class="fb-btn fb-fn" id="btn-fn" title="We missed a block">
-      Block missed
-    </button>
-  </div>
-
-  <div class="footer">
-    <button class="link-btn" id="run-benchmark">Run benchmark</button>
-    <span class="sep">·</span>
-    <button class="link-btn" id="clear-cache">Clear ML cache</button>
-    <span class="sep">·</span>
-    <span class="sync-badge" id="sync-badge" title="Events waiting to sync"></span>
-  </div>
-
-  <div id="benchmark-panel" class="benchmark-panel hidden">
-    <div class="section-title">Benchmark: ML vs Lists</div>
-    <div id="benchmark-results"></div>
   </div>
 
   <script src="popup.js"></script>
