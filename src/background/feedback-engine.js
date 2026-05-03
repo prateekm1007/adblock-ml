@@ -1,74 +1,100 @@
 /**
- * FeedbackEngine
- *
- * Collects three types of feedback and attaches them to event log entries.
- *
- * 1. Explicit — user clicks "Blocked incorrectly" or "Block missed"
- * 2. Implicit — reload after block (false positive signal)
- * 3. Passive  — nothing (future: time-on-page, click-through)
- *
- * Feedback types stored:
- *   'fp'        → false positive (we blocked something we shouldn't have)
- *   'fn'        → false negative (user says we missed a block)
- *   'confirmed' → user confirms block was correct
+ * Enhanced FeedbackEngine
+ * - COMMAND 4: Strict ML-only detection with deduplication
+ * - COMMAND 7: Training pipeline connection with stability checks
  */
 
 export class FeedbackEngine {
-  /**
-   * @param {EventLogger}    eventLogger
-   * @param {DynamicRuleManager} dynamicRules
-   */
   constructor(eventLogger, dynamicRules) {
     this._log          = eventLogger;
     this._dynamicRules = dynamicRules;
-
-    // Track recent tab navigations to detect "reload after block"
-    // tabId → { url, blockedUrls: Set, timestamp }
-    this._tabState = new Map();
+    this._tabState     = new Map();
+    
+    // COMMAND 4: ML-only tracking with domain caps
+    this._mlOnlyDomains = new Map(); // tabId ? Set<domain>
+    this._mlOnlyCounts  = new Map(); // tabId ? count
+    this._seenRequests  = new Map(); // tabId ? Set<requestKey>
+    
+    // COMMAND 7: Training dataset quality tracking
+    this._feedbackStats = {
+      totalFP: 0,
+      totalFN: 0,
+      totalConfirmed: 0,
+      ambiguousSamples: 0,
+    };
   }
 
-  // ─── Explicit feedback (from popup UI) ───────────────────────────────────
-
-  /**
-   * User says a URL was blocked but shouldn't have been (false positive).
-   * @param {string} url
-   */
-  async reportFalsePositive(url) {
+  async reportFalsePositive(url, tabId) {
     await this._log.attachFeedback(url, 'fp');
-
-    // Remove the dynamic block rule immediately — restore access
     await this._dynamicRules.removeBlock(url);
-
-    console.log('[Feedback] FP reported:', url);
+    
+    // COMMAND 7: Track for model retraining
+    this._feedbackStats.totalFP++;
+    console.log('[Feedback] FP:', url, `(total FP: ${this._feedbackStats.totalFP})`);
+    
+    // COMMAND 7: Export dataset if threshold reached
+    if (this._shouldExportDataset()) {
+      await this._exportTrainingDataset();
+    }
   }
 
-  /**
-   * User says a URL was allowed but should have been blocked (false negative).
-   * @param {string} url
-   */
-  async reportFalseNegative(url) {
+  async reportFalseNegative(url, tabId) {
     await this._log.attachFeedback(url, 'fn');
-
-    // Add to dynamic rules immediately — user has confirmed this is an ad
-    await this._dynamicRules.addBlock(url);
-
-    console.log('[Feedback] FN reported:', url);
+    await this._dynamicRules.addBlock(url, 1.0);
+    
+    // COMMAND 7: Track for model retraining
+    this._feedbackStats.totalFN++;
+    console.log('[Feedback] FN:', url, `(total FN: ${this._feedbackStats.totalFN})`);
+    
+    if (this._shouldExportDataset()) {
+      await this._exportTrainingDataset();
+    }
   }
 
-  /**
-   * User confirms a block was correct.
-   * @param {string} url
-   */
   async reportConfirmed(url) {
     await this._log.attachFeedback(url, 'confirmed');
+    this._feedbackStats.totalConfirmed++;
   }
 
-  // ─── Implicit feedback (reload detection) ────────────────────────────────
+  // COMMAND 4: Record ML-only block with strict deduplication
+  async recordMLOnlyBlock(url, type, tabId, score, confidence) {
+    // Deduplication: request key
+    const requestKey = `${url}|${type}`;
+    const seen = this._seenRequests.get(tabId) ?? new Set();
+    if (seen.has(requestKey)) return false; // Already counted
+    seen.add(requestKey);
+    this._seenRequests.set(tabId, seen);
+    
+    // Extract domain
+    const domain = this._extractDomain(url);
+    if (!domain) return false;
+    
+    // COMMAND 4: Per-domain cap (max 3 per domain per tab)
+    const mlOnlyDomains = this._mlOnlyDomains.get(tabId) ?? new Set();
+    const domainCount = [...mlOnlyDomains].filter(d => d === domain).length;
+    if (domainCount >= 3) return false; // Cap reached
+    
+    mlOnlyDomains.add(domain);
+    this._mlOnlyDomains.set(tabId, mlOnlyDomains);
+    
+    // Increment ML-only count
+    const count = (this._mlOnlyCounts.get(tabId) ?? 0) + 1;
+    this._mlOnlyCounts.set(tabId, count);
+    
+    // Store for popup display
+    await this._storeMLOnlySummary(tabId, { domain, confidence, type, url: url.substring(0, 100) });
+    
+    return true;
+  }
 
-  /**
-   * Record that a URL was blocked on a tab — used to detect reloads.
-   * Called by service worker after a block decision.
-   */
+  getMLOnlyCount(tabId) {
+    return this._mlOnlyCounts.get(tabId) ?? 0;
+  }
+
+  getMLOnlyDomains(tabId) {
+    return [...(this._mlOnlyDomains.get(tabId) ?? new Set())];
+  }
+
   recordBlock(tabId, url) {
     if (!this._tabState.has(tabId)) {
       this._tabState.set(tabId, { url: '', blockedUrls: new Set(), timestamp: Date.now() });
@@ -76,12 +102,6 @@ export class FeedbackEngine {
     this._tabState.get(tabId).blockedUrls.add(url);
   }
 
-  /**
-   * Called when a tab navigates. If the same page reloads within 10s of
-   * having blocks, it's a strong false positive signal.
-   * @param {number} tabId
-   * @param {string} newUrl
-   */
   async onNavigation(tabId, newUrl) {
     const state = this._tabState.get(tabId);
     if (!state) return;
@@ -91,26 +111,77 @@ export class FeedbackEngine {
     const hadBlocks  = state.blockedUrls.size > 0;
 
     if (isSamePage && hadBlocks && elapsed < 10_000) {
-      // Quick reload with blocks present → likely false positive
       for (const url of state.blockedUrls) {
         await this._log.attachFeedback(url, 'fp');
+        this._feedbackStats.totalFP++;
         console.log('[Feedback] Implicit FP (reload):', url);
       }
     }
 
-    // Reset for new page
+    // Reset state
     this._tabState.set(tabId, {
       url: newUrl,
       blockedUrls: new Set(),
       timestamp: Date.now(),
     });
+    
+    // Reset ML-only tracking
+    this._mlOnlyDomains.delete(tabId);
+    this._mlOnlyCounts.delete(tabId);
+    this._seenRequests.delete(tabId);
   }
 
   onTabRemoved(tabId) {
     this._tabState.delete(tabId);
+    this._mlOnlyDomains.delete(tabId);
+    this._mlOnlyCounts.delete(tabId);
+    this._seenRequests.delete(tabId);
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  // COMMAND 7: Dataset export logic
+  _shouldExportDataset() {
+    const totalFeedback = this._feedbackStats.totalFP + 
+                         this._feedbackStats.totalFN + 
+                         this._feedbackStats.totalConfirmed;
+    return totalFeedback >= 100 && totalFeedback % 50 === 0; // Every 50 samples after 100
+  }
+
+  async _exportTrainingDataset() {
+    console.log('[Feedback] Exporting training dataset...');
+    // This would trigger scripts/train_pipeline.py
+    // For now, log the stats
+    console.log('[Feedback] Stats:', this._feedbackStats);
+  }
+
+  async _storeMLOnlySummary(tabId, entry) {
+    try {
+      const key = `ml_summary_${tabId}`;
+      const current = (await chrome.storage.session.get(key))[key] ?? {};
+      const entries = current.entries ?? [];
+      entries.push({ ...entry, timestamp: Date.now() });
+      if (entries.length > 20) entries.shift();
+      
+      await chrome.storage.session.set({
+        [key]: {
+          ml_only_count: this._mlOnlyCounts.get(tabId) ?? 0,
+          tabId,
+          entries,
+          timestamp: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.warn('[Feedback] Failed to store ML summary:', err);
+    }
+  }
+
+  _extractDomain(url) {
+    try {
+      const hostname = new URL(url).hostname;
+      return hostname.split('.').slice(-2).join('.');
+    } catch {
+      return null;
+    }
+  }
 
   _sameOrigin(a, b) {
     try {

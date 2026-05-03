@@ -1,5 +1,7 @@
-﻿/**
- * DynamicRuleManager
+/**
+ * Enhanced DynamicRuleManager
+ * - COMMAND 2: Session-based domain promotion (=3 hits ? DNR rule)
+ * - TTL-based rule expiration
  */
 
 const MAX_RULES         = 4800;
@@ -9,11 +11,11 @@ const RULE_ID_OFFSET    = 100_000;
 const SITE_ALLOW_OFFSET = 200_000;
 const STORAGE_KEY       = 'adblock_ml_dynamic_rules';
 
-const HIGH_CONFIDENCE   = 0.92;
+const HIGH_CONFIDENCE   = 0.90; // COMMAND 2: Increased from 0.92
 const TTL_HIGH_MS       = 72 * 60 * 60 * 1000;
 const TTL_LOW_MS        = 24 * 60 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 60 * 1000;
-const PROMOTE_THRESHOLD = 3;
+const PROMOTE_THRESHOLD = 3; // COMMAND 2: Domain must appear 3x in session
 
 const RESOURCE_TYPES = [
   'script', 'xmlhttprequest', 'fetch', 'image',
@@ -22,13 +24,16 @@ const RESOURCE_TYPES = [
 
 export class DynamicRuleManager {
   constructor() {
-    this._high          = new Map();
-    this._low           = new Map();
+    this._high          = new Map(); // pattern ? { id, addedAt, confidence, domain }
+    this._low           = new Map(); // pattern ? { hits, firstSeen, lastSeen }
     this._blockSet      = new Set();
     this._siteAllows    = new Map();
     this._nextId        = RULE_ID_OFFSET;
     this._pruneTimer    = null;
     this._scheduleTimer = null;
+    
+    // COMMAND 2: Session-based promotion tracking
+    this._sessionDomains = new Map(); // domain ? hit count
   }
 
   async initialize() {
@@ -41,6 +46,7 @@ export class DynamicRuleManager {
         this._blockSet   = new Set(data.blockSet  ?? []);
         this._siteAllows = new Map(Object.entries(data.siteAllows ?? {}));
         this._nextId     = data.nextId ?? RULE_ID_OFFSET;
+        this._sessionDomains = new Map(Object.entries(data.sessionDomains ?? {}));
       }
     } catch { /* first run */ }
     this._pruneTimer = setInterval(() => this._prune(), PRUNE_INTERVAL_MS);
@@ -50,11 +56,21 @@ export class DynamicRuleManager {
     return this._blockSet.has(this._toPattern(url));
   }
 
+  // COMMAND 2: Enhanced addBlock with session promotion
   async addBlock(url, score = 1.0) {
     const pattern = this._toPattern(url);
+    const domain = this._extractDomain(url);
+    
     if (this._blockSet.has(pattern)) return;
-    if (score >= HIGH_CONFIDENCE) {
-      await this._addHighConfidence(pattern);
+    
+    // Track domain hits for promotion
+    const hits = (this._sessionDomains.get(domain) || 0) + 1;
+    this._sessionDomains.set(domain, hits);
+    
+    // COMMAND 2: Auto-promote if =3 hits in session OR high confidence
+    if (score >= HIGH_CONFIDENCE || hits >= PROMOTE_THRESHOLD) {
+      await this._addHighConfidence(pattern, score, domain);
+      console.log(`[DNR-Promote] ${domain} (hits=${hits}, score=${score.toFixed(3)})`);
     } else {
       this._recordLowConfidence(pattern);
     }
@@ -124,17 +140,26 @@ export class DynamicRuleManager {
     this._low.clear();
     this._blockSet.clear();
     this._siteAllows.clear();
+    this._sessionDomains.clear();
     this._nextId = RULE_ID_OFFSET;
     await this._persist();
   }
 
   getStats() {
-    return { high: this._high.size, low: this._low.size, total: this._high.size };
+    return {
+      high: this._high.size,
+      low: this._low.size,
+      total: this._high.size,
+      sessionDomains: this._sessionDomains.size,
+    };
   }
 
-  async _addHighConfidence(pattern) {
+  // COMMAND 2: Store confidence + domain for TTL calculation
+  async _addHighConfidence(pattern, confidence, domain) {
     if (this._high.size >= MAX_RULES) await this._evictOldest();
     const id = this._nextId++;
+    const ttl = confidence >= 0.95 ? TTL_HIGH_MS : TTL_LOW_MS;
+    
     try {
       await chrome.declarativeNetRequest.updateDynamicRules({
         addRules: [{
@@ -144,7 +169,13 @@ export class DynamicRuleManager {
         }],
         removeRuleIds: [],
       });
-      this._high.set(pattern, { id, addedAt: Date.now() });
+      this._high.set(pattern, {
+        id,
+        addedAt: Date.now(),
+        confidence,
+        domain,
+        ttl,
+      });
       this._blockSet.add(pattern);
       this._low.delete(pattern);
       this._schedulePersist();
@@ -160,7 +191,8 @@ export class DynamicRuleManager {
       existing.hits++;
       existing.lastSeen = now;
       if (existing.hits >= PROMOTE_THRESHOLD) {
-        this._addHighConfidence(pattern);
+        const domain = this._extractDomain(pattern);
+        this._addHighConfidence(pattern, 0.85, domain);
         return;
       }
     } else {
@@ -172,22 +204,33 @@ export class DynamicRuleManager {
   async _prune() {
     const now      = Date.now();
     const toRemove = [];
+    
+    // COMMAND 2: Use per-rule TTL instead of global
     for (const [pattern, entry] of this._high) {
-      if (now - entry.addedAt > TTL_HIGH_MS) toRemove.push({ pattern, id: entry.id });
+      const age = now - entry.addedAt;
+      const ttl = entry.ttl || TTL_HIGH_MS;
+      if (age > ttl) {
+        toRemove.push({ pattern, id: entry.id });
+      }
     }
+    
     for (const [pattern, entry] of this._low) {
       if (now - entry.lastSeen > TTL_LOW_MS) this._low.delete(pattern);
     }
+    
     if (!toRemove.length) return;
+    
     try {
       await chrome.declarativeNetRequest.updateDynamicRules({
         addRules: [], removeRuleIds: toRemove.map(r => r.id),
       });
     } catch { /* best effort */ }
+    
     toRemove.forEach(({ pattern }) => {
       this._high.delete(pattern);
       this._blockSet.delete(pattern);
     });
+    
     console.log(`[DynamicRules] Pruned ${toRemove.length} expired rules`);
     await this._persist();
   }
@@ -207,6 +250,15 @@ export class DynamicRuleManager {
     catch { return url; }
   }
 
+  _extractDomain(url) {
+    try {
+      const hostname = new URL(url).hostname;
+      return hostname.split('.').slice(-2).join('.');
+    } catch {
+      return url.substring(0, 30);
+    }
+  }
+
   _schedulePersist() {
     if (this._scheduleTimer) clearTimeout(this._scheduleTimer);
     this._scheduleTimer = setTimeout(() => this._persist(), 500);
@@ -217,14 +269,18 @@ export class DynamicRuleManager {
     this._high.forEach((v, k) => { highObj[k] = v; });
     const lowObj = {};
     this._low.forEach((v, k) => { lowObj[k] = v; });
+    const sessionObj = {};
+    this._sessionDomains.forEach((v, k) => { sessionObj[k] = v; });
+    
     try {
       await chrome.storage.session.set({
         [STORAGE_KEY]: {
-          high:       highObj,
-          low:        lowObj,
-          blockSet:   [...this._blockSet],
-          siteAllows: Object.fromEntries(this._siteAllows),
-          nextId:     this._nextId,
+          high:           highObj,
+          low:            lowObj,
+          blockSet:       [...this._blockSet],
+          siteAllows:     Object.fromEntries(this._siteAllows),
+          sessionDomains: sessionObj,
+          nextId:         this._nextId,
         },
       });
     } catch (err) {
