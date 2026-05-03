@@ -110,6 +110,7 @@ export class AdFlushClassifier {
       const hasTrackerKeywords = features[26] > 0.3 || features[27] > 0.3;
       
       // First-party suspicious if same domain BUT tracker behavior
+      // first_party_suspicious: same-domain tracker behavior detected
       features[29] = (isSameDomain && hasHighEntropy && (isLateInjection || hasTrackerKeywords)) ? 1.0 : 0.0;
     } catch {}
 
@@ -189,3 +190,4 @@ export class AdFlushClassifier {
     return this.scoreFromFeatures(features, details.url);
   }
 }
+
